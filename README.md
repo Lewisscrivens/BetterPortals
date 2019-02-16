@@ -1,4 +1,8 @@
 # UE4BetterPortals
+
+Some quick improvements to the unreal engine documentation for simple portals, this can be found at the following link.
+https://wiki.unrealengine.com/Simple_Portals
+
 VR portals that are seemless. Using scenecapture2D and depth masks.
 
 To start with I just used the simple portals template from unreal but if you do this you will see a few differences not big but noticable
