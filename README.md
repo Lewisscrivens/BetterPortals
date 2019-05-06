@@ -1,4 +1,4 @@
-# UE4BetterPortals
+# BetterPortals
 
 Some quick improvements to the unreal engine documentation for simple portals, this can be found at the following link.
 https://wiki.unrealengine.com/Simple_Portals
