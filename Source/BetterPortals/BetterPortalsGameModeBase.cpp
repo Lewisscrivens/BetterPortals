@@ -11,6 +11,8 @@ ABetterPortalsGameModeBase::ABetterPortalsGameModeBase()
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.TickGroup = ETickingGroup::TG_PostUpdateWork;
 
+	// Defaults.
+	performantPortals = true;
 }
 
 void ABetterPortalsGameModeBase::BeginPlay()
@@ -37,7 +39,7 @@ void ABetterPortalsGameModeBase::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 
 	// Run function to update the portals in the scene.
-	if (portals.Num() > 0)
+	if (performantPortals && portals.Num() > 0)
 	{
 		UpdatePortals();
 	}

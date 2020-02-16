@@ -2,12 +2,12 @@
 #include "Portal.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
-#include "Components/SkeletalMeshComponent.h"
 #include "Components/SceneCaptureComponent2D.h"
 #include "Components/BoxComponent.h"
 #include "PhysicsEngine/PhysicsHandleComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "UObject/UObjectGlobals.h"
 #include "Engine/CanvasRenderTarget2D.h"
 #include "Engine/Engine.h"
 #include "Camera/CameraComponent.h"
@@ -15,6 +15,7 @@
 #include "Plane.h"
 #include "PortalPawn.h"
 #include "PortalPlayer.h"
+#include "DrawDebugHelpers.h"
 
 DEFINE_LOG_CATEGORY(LogPortal);
 
@@ -26,44 +27,55 @@ APortal::APortal()
 	// Create class default sub-objects.
 	RootComponent = CreateDefaultSubobject<USceneComponent>("RootComponent");
 	RootComponent->Mobility = EComponentMobility::Static; // Portals are static objects.
-	portalMesh = CreateDefaultSubobject<USkeletalMeshComponent>("PortalMesh");
+	portalMesh = CreateDefaultSubobject<UStaticMeshComponent>("PortalMesh");
+	portalMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	portalMesh->SetCollisionProfileName("OverlapAll");
+	portalMesh->SetupAttachment(RootComponent);
 
 	// Setup portal overlap box for detecting actors.
 	portalBox = CreateDefaultSubobject<UBoxComponent>(TEXT("PortalBox"));
+	portalBox->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	portalBox->SetCollisionProfileName("OverlapAll");
+	portalBox->SetupAttachment(portalMesh);
 	
 	// Setup default scene capture comp.
 	portalCapture = CreateDefaultSubobject<USceneCaptureComponent2D>("PortalCapture");
-	portalCapture->AttachToComponent(GetRootComponent(), FAttachmentTransformRules::SnapToTargetIncludingScale);
+	portalCapture->SetupAttachment(RootComponent);
+	portalCapture->bEnableClipPlane = true;
+	portalCapture->bUseCustomProjectionMatrix = true;
 	portalCapture->bCaptureEveryFrame = false;
 	portalCapture->bCaptureOnMovement = false;
 	portalCapture->LODDistanceFactor = 3;
-	portalCapture->TextureTarget = nullptr;
-	portalCapture->bEnableClipPlane = true;
-	portalCapture->bUseCustomProjectionMatrix = true;
-	portalCapture->CaptureSource = ESceneCaptureSource::SCS_SceneColorSceneDepth;
-	FPostProcessSettings CaptureSettings;
-	CaptureSettings.bOverride_AmbientOcclusionQuality = true;
-	CaptureSettings.bOverride_MotionBlurAmount = true;
-	CaptureSettings.bOverride_SceneFringeIntensity = true;
-	CaptureSettings.bOverride_GrainIntensity = true;
-	CaptureSettings.bOverride_ScreenSpaceReflectionQuality = true;
-	CaptureSettings.AmbientOcclusionQuality = 50.0f;
-	CaptureSettings.MotionBlurAmount = 0.0f; 
-	CaptureSettings.SceneFringeIntensity = 0.0f; 
-	CaptureSettings.GrainIntensity = 0.0f; 
-	CaptureSettings.ScreenSpaceReflectionQuality = 0.0f; // Set to one to enable SSR.
-	CaptureSettings.bOverride_ScreenPercentage = true;
-	CaptureSettings.ScreenPercentage = 100.0f;
-	portalCapture->PostProcessSettings = CaptureSettings;
+	portalCapture->TextureTarget = nullptr;	
+	portalCapture->CaptureSource = ESceneCaptureSource::SCS_SceneColorSceneDepth;// Stores Scene Depth in A channel.
+	
+	// Create default portal capture settings.
+	FPostProcessSettings portalCaptureSettings;
+	portalCaptureSettings.AmbientOcclusionQuality = 50.0f;
+	portalCaptureSettings.MotionBlurAmount = 0.0f;
+	portalCaptureSettings.SceneFringeIntensity = 0.0f;
+	portalCaptureSettings.GrainIntensity = 0.0f;
+	portalCaptureSettings.ScreenSpaceReflectionQuality = 0.0f; // Set to one to enable SSR.
+	portalCaptureSettings.bOverride_ScreenPercentage = true;
+	portalCaptureSettings.ScreenPercentage = 100.0f;
+	portalCaptureSettings.bOverride_AmbientOcclusionQuality = true;
+	portalCaptureSettings.bOverride_MotionBlurAmount = true;
+	portalCaptureSettings.bOverride_SceneFringeIntensity = true;
+	portalCaptureSettings.bOverride_GrainIntensity = true;
+	portalCaptureSettings.bOverride_ScreenSpaceReflectionQuality = true;
+	portalCapture->PostProcessSettings = portalCaptureSettings;
 
-	// Set default class variables.
-	active = false;
+	// Set active by default. 
+    // NOTE: If performant portals is enabled in game mode portals will be deactivated until needed to be activated...
+	active = true;
+	initialised = false;
+	debugCameraTransform = false;
 }
 
 void APortal::BeginPlay()
 {
 	Super::BeginPlay();
-	
+
 	// If there is no target destroy and print log message.
 	CHECK_DESTROY(LogPortal, (!targetPortal || !Cast<APortal>(targetPortal)), "Portal %s, was destroyed as there was no target portal or it wasnt a type of APortal class.", *GetName());
 
@@ -78,36 +90,41 @@ void APortal::BeginPlay()
 	// Create a render target for this portal and its dynamic material instance. Then check if it has been successfully created.
 	CreatePortalTexture();
 	CHECK_DESTROY(LogPortal, (!renderTarget || !portalMaterial), "render target or portal material was null and could not be created in the portal class %s.", *GetName());
+
+	// Begin play ran.
+	initialised = true;
 }
 
 void APortal::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	// Clear portal information.
-	portalMaterial->SetScalarParameterValue("ScaleOffset", 0.0f);
-	ClearPortalView();
-
-	// If the portal is active.
-	if (active)
+	// If begin play has been ran.
+	if (initialised)
 	{
-		// Update the portals view.
-		UpdatePortalView();
+		// Clear portal information.
+		portalMaterial->SetScalarParameterValue("ScaleOffset", 0.0f);
+		ClearPortalView();
 
-		// Check if the player needs teleporting through this portal.
-		if (LocationInsidePortal(portalPawn->camera->GetComponentLocation()))
+		// If the portal is active.
+		if (active)
 		{
-			// Update world offset to prevent clipping.
-			portalMaterial->SetScalarParameterValue("ScaleOffset", 1.0f);
+			// Update the portals view.
+			UpdatePortalView();
 
-			// TODO: Check if the players camera has passed through the portal between frames...
+			// Check if the player needs teleporting through this portal.
+			if (LocationInsidePortal(portalPawn->camera->GetComponentLocation()))
+			{
+				// Update world offset to prevent clipping.
+				portalMaterial->SetScalarParameterValue("ScaleOffset", 1.0f);
+
+				// TODO: Check if the players camera has passed through the portal between frames...
+
+			}
+
+			// NOTE: GET ALL OVERLAPPING PHYSICS ACTORS WITH THE PORTAL BOX AND DECIDE TO TELEPORT OR NOT...
 
 		}
-
-		// NOTE: GET ALL OVERLAPPING PHYSICS ACTORS WITH THE PORTAL BOX AND DECIDE TO TELEPORT OR NOT...
-
-
-
 	}
 }
 
@@ -134,19 +151,9 @@ void APortal::CreatePortalTexture()
 	int32 viewportX, viewportY;
 	portalController->GetViewportSize(viewportX, viewportY);
 
-	// Cleanup existing Render textures stuck in memory.
-	if (renderTarget != nullptr && renderTarget->IsValidLowLevel())
-	{
-		renderTarget->BeginDestroy();
-		renderTarget = nullptr;
-		GEngine->ForceGarbageCollection();
-	}
-
 	// Create new render texture.
 	renderTarget = nullptr;
-	renderTarget = NewObject<UCanvasRenderTarget2D>(this, UCanvasRenderTarget2D::StaticClass(), *FString("PortalRenderTarget"));
-	renderTarget->SizeX = viewportX;
-	renderTarget->SizeY = viewportY;
+	renderTarget = UCanvasRenderTarget2D::CreateCanvasRenderTarget2D(GetWorld(), UCanvasRenderTarget2D::StaticClass(), viewportX, viewportY);
 
 	// Create the dynamic material instance for the portal mesh to show the render texture.
 	portalMaterial = portalMesh->CreateDynamicMaterialInstance(0, portalMaterialInstance);
@@ -166,6 +173,9 @@ void APortal::UpdatePortalView()
 	// Position the scene capture relative to the other portal to get the render texture.
 	FTransform newCamTransform = ConvertTransformToTarget(playerCamera->GetComponentLocation(), playerCamera->GetComponentRotation());
 	portalCapture->SetWorldLocationAndRotation(newCamTransform.GetLocation(), newCamTransform.GetRotation());
+
+	// Use-full for debugging convert transform to target function on the camera.
+	if (debugCameraTransform) DrawDebugBox(GetWorld(), newCamTransform.GetLocation(), FVector(10.0f), newCamTransform.GetRotation(), FColor::Red, false, 0.05f, 0.0f, 2.0f);
 
 	// Setup clip plane to cut out objects between the camera and the back of the portal.
 	portalCapture->ClipPlaneNormal = targetPortal->GetActorForwardVector();
@@ -226,24 +236,23 @@ FTransform APortal::ConvertTransformToTarget(FVector location, FRotator rotation
 {
 	FTransform newTransform;
 
-	// Translate location to target portal location.
-	FVector direction = location - GetActorLocation();
-	FVector newWorldLocation = targetPortal->GetActorLocation();
-	FVector dot;
-	dot.X = FVector::DotProduct(direction, GetActorForwardVector());
-	dot.Y = FVector::DotProduct(direction, GetActorRightVector());
-	dot.Z = FVector::DotProduct(direction, GetActorUpVector());
-	FVector newDirection = dot.X * targetPortal->GetActorForwardVector() 
-		+ dot.Y * targetPortal->GetActorRightVector()
-		+ dot.Z * targetPortal->GetActorUpVector();
+	// Get target portal actor.
+	APortal* portalTarget = Cast<APortal>(targetPortal);
 
-	// Translate rotation to target portal rotation.
-	FQuat relativeRotation = GetActorTransform().GetRotation().Inverse() * rotation.Quaternion();
-	FQuat newWorldRotation = targetPortal->GetActorTransform().GetRotation() * relativeRotation;
+	// Convert location to new portal.
+	FVector posRelativeToPortal = portalMesh->GetComponentTransform().InverseTransformPositionNoScale(location);
+	posRelativeToPortal.X *= -1; // Flip forward axis.
+	posRelativeToPortal.Y *= -1; // Flip right axis.
+	FVector newWorldLocation = portalTarget->portalMesh->GetComponentTransform().TransformPositionNoScale(posRelativeToPortal);
+
+	// Convert rotation to new portal.
+	FQuat relativeRotation = portalMesh->GetComponentTransform().InverseTransformRotation(rotation.Quaternion());;
+	FRotator newWorldRotation = portalTarget->portalMesh->GetComponentTransform().TransformRotation(relativeRotation).Rotator();
+	newWorldRotation.Yaw += 180.0f;
 
 	// Set location and rotation variables to return.
-	newTransform.SetLocation(newWorldLocation + newDirection);
-	newTransform.SetRotation(newWorldRotation);
+	newTransform.SetLocation(newWorldLocation);
+	newTransform.SetRotation(newWorldRotation.Quaternion());
 
 	// Return the converted location and rotation.
 	return newTransform;

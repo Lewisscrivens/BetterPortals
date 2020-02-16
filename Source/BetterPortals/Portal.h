@@ -20,15 +20,15 @@ class BETTERPORTALS_API APortal : public AActor
 public:	
 	
 	/* The portal mesh. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Portal")
-	class USkeletalMeshComponent* portalMesh;
+	UPROPERTY(BlueprintReadWrite, VisibleAnywhere, Category = "Portal")
+	class UStaticMeshComponent* portalMesh;
 
 	/* Box overlap component for teleporting actors. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Portal")
+	UPROPERTY(BlueprintReadWrite, VisibleAnywhere, Category = "Portal")
 	class UBoxComponent* portalBox;
 
 	/* Scene capture component for creating the portal render target. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Portal")
+	UPROPERTY(BlueprintReadWrite, VisibleAnywhere, Category = "Portal")
 	class USceneCaptureComponent2D* portalCapture;
 
 	/* The other portal actor to target. */
@@ -39,8 +39,13 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Portal")
 	class UMaterialInterface* portalMaterialInstance;
 
+	/* Debug the duplicated camera position and rotation relative to the other portal by drawing debug cube based of scenecapture2D transform. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Portal")
+	bool debugCameraTransform;
+
 private:
 
+	bool initialised; /* Has begin play been ran. */
 	bool active; /* Is this portal active? NOTE: Currently does nothing but is true when its being updated. */
 	class APlayerController* portalController; /* The player controller. */
 	class APortalPawn* portalPawn; /* The portal pawn. */

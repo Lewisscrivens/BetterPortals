@@ -16,6 +16,10 @@ class BETTERPORTALS_API ABetterPortalsGameModeBase : public AGameModeBase
 	GENERATED_BODY()
 
 public:
+	
+	/* Should the game mode class activate/deactivate portals based on player location and distance. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Portal")
+	bool performantPortals;
 
 	/* Pointers to keep track of which portals to update. */
 	class APortalPawn* pawn;
