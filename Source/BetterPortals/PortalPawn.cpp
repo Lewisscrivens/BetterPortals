@@ -30,7 +30,7 @@ APortalPawn::APortalPawn()
 	playerCapsule->SetCollisionResponseToAllChannels(ECR_Block);
 	playerCapsule->SetCollisionResponseToChannel(ECC_Visibility, ECR_Ignore);
 	playerCapsule->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
-	playerCapsule->SetCapsuleHalfHeight(90.0f);
+	playerCapsule->SetCapsuleHalfHeight(characterSettings.standingHeight);
 	playerCapsule->SetCapsuleRadius(40.0f);
 	playerCapsule->SetMassOverrideInKg(NAME_None, characterSettings.mass);
 	playerCapsule->SetSimulatePhysics(true);
@@ -65,6 +65,9 @@ APortalPawn::APortalPawn()
 void APortalPawn::BeginPlay()
 {
 	Super::BeginPlay();
+
+	// Ensure standing height is correct.
+	playerCapsule->SetCapsuleHalfHeight(characterSettings.standingHeight);
 
 	// IMPORTANT BUG FIXES FOR PHYSICS LOCKING OF DIFFERENT AXIS.
 	FVector intertia = playerCapsule->BodyInstance.GetBodyInertiaTensor();
@@ -131,8 +134,11 @@ void APortalPawn::JumpAction(bool pressed)
 	if (pressed)
 	{
 		// If double jump is enabled and only jumped once up to now allow another jump mid air or if the character is grounded.
-		if (characterSettings.doubleJump ? jumpCount < 2 || characterSettings.IsGrounded() : characterSettings.IsGrounded())
+		if (characterSettings.doubleJump ? jumpCount < 1 || characterSettings.IsGrounded() : characterSettings.IsGrounded())
 		{
+			FVector newVel = playerCapsule->GetPhysicsLinearVelocity();
+			newVel.Z = 0.0f;// Zero out the capsule velocity in the Z direction to ensure upwards force feels the same when pressed.
+			playerCapsule->SetPhysicsLinearVelocity(newVel);
 			playerCapsule->AddImpulse(1000.0f * characterSettings.jumpForce * playerCapsule->GetUpVector());
 			jumpCount++;
 		}
@@ -172,7 +178,7 @@ void APortalPawn::CrouchAction(bool pressed)
 	if (pressed)
 	{
 		// Set crouched height.
-		crouchLerp.endingHeight = 60.0f;
+		crouchLerp.endingHeight = characterSettings.crouchingHeight;
 
 		// Start new crouch timer lerp.
 		FTimerDelegate crouchTimerDelegate;
@@ -187,7 +193,7 @@ void APortalPawn::CrouchAction(bool pressed)
 	else
 	{
 		// Set un-crouched height.
-		crouchLerp.endingHeight = 90.0f;
+		crouchLerp.endingHeight = characterSettings.standingHeight;
 
 		// Start new crouch timer lerp.
 		FTimerDelegate crouchTimerDelegate;
@@ -283,7 +289,7 @@ bool APortalPawn::GroundCheck()
 	FCollisionQueryParams collParams;
 	collParams.AddIgnoredActor(this);
 	FVector capsuleBottom = playerCapsule->GetComponentLocation();
-	capsuleBottom.Z -= playerCapsule->GetScaledCapsuleHalfHeight();
+	capsuleBottom.Z -= characterSettings.GetCurrentMovementState() == EMovementState::CROUCHING ? characterSettings.crouchingHeight : characterSettings.standingHeight;
 	GetWorld()->LineTraceSingleByChannel(groundHit, capsuleBottom, capsuleBottom - (playerCapsule->GetUpVector() * 2.0f),//<-- Ground trace distance
 		ECC_Pawn, collParams);
 	characterSettings.lastGroundHit = groundHit;
@@ -345,7 +351,7 @@ void APortalPawn::UpdateMovement(float deltaTime)
 	force -= dragForce;
 
 	//  NOTE: Fix too much force being added when moving vertically.
-	if (characterSettings.movementDir.X != 0 && characterSettings.movementDir.Y != 0) force *= 0.5f;
+	if (characterSettings.movementDir.X != 0 && characterSettings.movementDir.Y != 0) force *= 0.7f;
 
 	// Apply movement through physics to the capsule.
 	playerCapsule->AddForce(force / deltaTime);

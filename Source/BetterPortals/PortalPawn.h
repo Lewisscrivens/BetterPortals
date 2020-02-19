@@ -54,6 +54,14 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Camera")
 		float mouseSpeed;
 
+	/* The half height of the capsule when standing. NOTE: Will override the capsules half height on begin play. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Movement")
+		float standingHeight;
+
+	/* The half height of the capsule when crouching. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Movement")
+		float crouchingHeight;
+
 	/* Movement speed multiplier for adjusting. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Movement")
 		float movementSpeedMul;
@@ -142,12 +150,14 @@ public:
 		mouseSpeed = 1.0f;
 
 		// Setup default movement values.
+		standingHeight = 90.0f;
+		crouchingHeight = 60.0f;
 		movementSpeedMul = 6.0f;
-		movementDragMul = 2.0f;
+		movementDragMul = 1.5f;
 		airSpeed = FVector2D(60.0f, 100.0f);
-		walkSpeed = 200.0f;
+		walkSpeed = 220.0f;
 		runSpeed = 300.0f;
-		crouchSpeed = 100.0f;
+		crouchSpeed = 150.0f;
 		crouchTime = 0.2f;
 		jumpForce = 20.0f;
 		mass = 50.0f;

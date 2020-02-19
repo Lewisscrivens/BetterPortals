@@ -28,15 +28,15 @@ APortal::APortal()
 	RootComponent = CreateDefaultSubobject<USceneComponent>("RootComponent");
 	RootComponent->Mobility = EComponentMobility::Static; // Portals are static objects.
 	portalMesh = CreateDefaultSubobject<UStaticMeshComponent>("PortalMesh");
-	portalMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-	portalMesh->SetCollisionProfileName("OverlapAll");
+	portalMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	portalMesh->SetupAttachment(RootComponent);
 
 	// Setup portal overlap box for detecting actors.
 	portalBox = CreateDefaultSubobject<UBoxComponent>(TEXT("PortalBox"));
 	portalBox->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-	portalBox->SetCollisionProfileName("OverlapAll");
+	portalBox->SetCollisionProfileName("Portal");
 	portalBox->SetupAttachment(portalMesh);
+	portalBox->OnComponentBeginOverlap.AddDynamic(this, &APortal::OnPortalOverlap);
 	
 	// Setup default scene capture comp.
 	portalCapture = CreateDefaultSubobject<USceneCaptureComponent2D>("PortalCapture");
@@ -91,6 +91,9 @@ void APortal::BeginPlay()
 	CreatePortalTexture();
 	CHECK_DESTROY(LogPortal, (!renderTarget || !portalMaterial), "render target or portal material was null and could not be created in the portal class %s.", *GetName());
 
+	// Ensure the portal overlap box.
+	portalBox->OnComponentBeginOverlap.AddDynamic(this, &APortal::OnPortalOverlap);
+
 	// Begin play ran.
 	initialised = true;
 }
@@ -117,14 +120,34 @@ void APortal::Tick(float DeltaTime)
 			{
 				// Update world offset to prevent clipping.
 				portalMaterial->SetScalarParameterValue("ScaleOffset", 1.0f);
-
-				// TODO: Check if the players camera has passed through the portal between frames...
-
 			}
 
-			// NOTE: GET ALL OVERLAPPING PHYSICS ACTORS WITH THE PORTAL BOX AND DECIDE TO TELEPORT OR NOT...
-
+			// Loop through tracked actors and update the target portal relative to the actors locations and rotations.
+			UpdateTrackedActors();
 		}
+	}
+}
+
+void APortal::OnPortalOverlap(UPrimitiveComponent* portalMeshHit, AActor* overlappedActor, UPrimitiveComponent* overlappedComp, int32 otherBodyIndex, bool fromSweep, const FHitResult& portalHit)
+{
+	// If a physics enabled actor passes through the portal from the correct direction duplicate and track said object at the target portal.
+	USceneComponent* overlappedRootComponent = overlappedActor->GetRootComponent();
+	if (overlappedRootComponent && overlappedRootComponent->IsSimulatingPhysics())
+	{
+		// Ensure that the item thats entering the portal is in-front.
+		if (IsInfront(portalHit.Location))
+		{
+			AddTrackedActor(overlappedActor);
+		}
+	}
+}
+
+void APortal::OnOverlapEnd(UPrimitiveComponent* portalMeshHit, AActor* overlappedActor, UPrimitiveComponent* overlappedComp, int32 otherBodyIndex)
+{
+	// If the ended overlap is one of the tracked meshes passing through the portal or leaving remove copied mesh and stop tracking component/actor.
+	if (trackedActors.Find(overlappedActor))
+	{
+		RemoveTrackedActor(overlappedActor);
 	}
 }
 
@@ -138,11 +161,39 @@ void APortal::SetActive(bool activate)
 	active = activate;
 }
 
-bool APortal::IsInfront(FVector location)
+void APortal::AddTrackedActor(AActor* actorToAdd)
 {
-	FPlane plane = FPlane(portalMesh->GetComponentLocation(), portalMesh->GetForwardVector());
-	float dotProduct = plane.PlaneDot(location);
-	return (dotProduct >= 0); // Returns true if the location is in-front of this portal.
+	// Create visual copy of the tracked actor.
+
+	// Create tracked actor struct.
+	FTrackedActor track;
+	track.trackedActor = actorToAdd;
+
+	// Add to tracked actors.
+	trackedActors.Add(track);
+}
+
+void APortal::RemoveTrackedActor(AActor* actorToRemove)
+{
+	// Remove visual copy of the tracked actor.
+
+	// Remove tracked actor.
+	trackedActors.Remove(actorToRemove);
+}
+
+bool APortal::GetTrackingInfo(AActor* actorToCheck)
+{
+	for (FTrackedActor tracked : trackedActors)
+	{
+		if (tracked.trackedActor == actorToCheck)
+		{
+			Tr
+			return true;
+		}
+	}
+
+	// Return not found if exited for loop.
+	return FTrackedActor();
 }
 
 void APortal::CreatePortalTexture()
@@ -178,8 +229,11 @@ void APortal::UpdatePortalView()
 	if (debugCameraTransform) DrawDebugBox(GetWorld(), newCamTransform.GetLocation(), FVector(10.0f), newCamTransform.GetRotation(), FColor::Red, false, 0.05f, 0.0f, 2.0f);
 
 	// Setup clip plane to cut out objects between the camera and the back of the portal.
-	portalCapture->ClipPlaneNormal = targetPortal->GetActorForwardVector();
-	portalCapture->ClipPlaneBase = targetPortal->GetActorLocation() + (portalCapture->ClipPlaneNormal * -1.5f);
+	APortal* portalTarget = Cast<APortal>(targetPortal);
+	portalCapture->bEnableClipPlane = true;
+	portalCapture->bOverride_CustomNearClippingPlane = true;
+	portalCapture->ClipPlaneNormal = portalTarget->portalMesh->GetForwardVector();
+	portalCapture->ClipPlaneBase = portalTarget->portalMesh->GetComponentLocation();
 
 	// Assign the Render Target
 	portalCapture->TextureTarget = renderTarget;
@@ -188,6 +242,7 @@ void APortal::UpdatePortalView()
 	UPortalPlayer* portalPlayer = Cast<UPortalPlayer>(portalController->GetLocalPlayer());
 	CHECK_DESTROY(LogPortal, !portalPlayer, "UpdatePortalView: Portal player class couldnt be found in the portal %s.", *GetName());
 	portalCapture->CustomProjectionMatrix = portalPlayer->GetCameraProjectionMatrix();
+	portalCapture->bUseCustomProjectionMatrix = true;
 
 	// Update the portal scene capture to render it to the RT.
 	portalCapture->CaptureScene();
@@ -204,6 +259,14 @@ void APortal::UpdateWorldOffset()
 	{
 		portalMaterial->SetScalarParameterValue("ScaleOffset", 0.0f);
 	}
+}
+
+void APortal::UpdateTrackedActors()
+{
+	// Update the positions for the duplicate tracked actors at the target portal.
+
+	// Check for when the actors origin passes to the other side of the portal between frames. If so teleport the actor and destroy duplicate.
+
 }
 
 void APortal::TeleportObject(AActor* actor)
@@ -232,13 +295,20 @@ void APortal::TeleportObject(AActor* actor)
 	pTargetPortal->UpdatePortalView();
 }
 
+bool APortal::IsInfront(FVector location)
+{
+	FPlane plane = FPlane(portalMesh->GetComponentLocation(), portalMesh->GetForwardVector());
+	float dotProduct = plane.PlaneDot(location);
+	return (dotProduct >= 0); // Returns true if the location is in-front of this portal.
+}
+
 FTransform APortal::ConvertTransformToTarget(FVector location, FRotator rotation)
 {
 	FTransform newTransform;
 
 	// Get target portal actor.
 	APortal* portalTarget = Cast<APortal>(targetPortal);
-
+ 
 	// Convert location to new portal.
 	FVector posRelativeToPortal = portalMesh->GetComponentTransform().InverseTransformPositionNoScale(location);
 	posRelativeToPortal.X *= -1; // Flip forward axis.
