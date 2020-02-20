@@ -57,7 +57,6 @@ APortal::APortal()
 	initialised = false;
 	debugCameraTransform = false;
 	actorsBeingTracked = 0;
-	recursionAmount = 5;
 }
 
 void APortal::BeginPlay()
@@ -198,6 +197,16 @@ void APortal::ClearPortalView()
 
 void APortal::UpdatePortalView()
 {
+	// Get reference to player camera.
+	UCameraComponent* playerCamera = portalPawn->camera;
+
+	// Position the scene capture relative to the other portal to get the render texture.
+	FTransform newCamTransform = ConvertTransformToTarget(playerCamera->GetComponentLocation(), playerCamera->GetComponentRotation());
+	portalCapture->SetWorldLocationAndRotation(newCamTransform.GetLocation(), newCamTransform.GetRotation());
+
+	// Use-full for debugging convert transform to target function on the camera.
+	if (debugCameraTransform) DrawDebugBox(GetWorld(), newCamTransform.GetLocation(), FVector(10.0f), newCamTransform.GetRotation(), FColor::Red, false, 0.05f, 0.0f, 2.0f);
+
 	// Get cameras post-processing settings.
 	portalCapture->PostProcessSettings = portalPawn->camera->PostProcessSettings;
 
@@ -220,29 +229,8 @@ void APortal::UpdatePortalView()
 	portalCapture->bUseCustomProjectionMatrix = true;
 	portalCapture->CustomProjectionMatrix = portalPlayer->GetCameraProjectionMatrix();
 
-	// Get reference to player camera.
-	UCameraComponent* playerCamera = portalPawn->camera;
-
-	// Get the position of the main camera transform to the target portal.
-	FTransform newCamTransform = ConvertTransformToTarget(playerCamera->GetComponentLocation(), playerCamera->GetComponentRotation());
-	
-	// Recurse backwards for the max number of recursions and render to the texture each time overlaying each portal view.
-	for (int i = recursionAmount; i >= 0; i--)
-	{
-		// Update location of the scene capture.
-		FTransform recursiveCamTrans = newCamTransform;
-		for (int p = 0; p < i; p++)
-		{
-			recursiveCamTrans = ConvertTransformToTarget(recursiveCamTrans.GetLocation(), recursiveCamTrans.GetRotation().Rotator());
-		}
-		portalCapture->SetWorldLocationAndRotation(recursiveCamTrans.GetLocation(), recursiveCamTrans.GetRotation());
-
-		// Use-full for debugging convert transform to target function on the camera.
-		if (debugCameraTransform) DrawDebugBox(GetWorld(), recursiveCamTrans.GetLocation(), FVector(10.0f), recursiveCamTrans.GetRotation(), FColor::Red, false, 0.05f, 0.0f, 2.0f);
-
-		// Update the portal scene capture to render it to the RT.
-		portalCapture->CaptureScene();
-	}
+	// Update the portal scene capture to render it to the RT.
+	portalCapture->CaptureScene();
 }
 
 void APortal::UpdateWorldOffset()

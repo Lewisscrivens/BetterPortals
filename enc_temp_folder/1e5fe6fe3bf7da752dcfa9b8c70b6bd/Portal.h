@@ -67,12 +67,8 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Portal")
 	class UMaterialInterface* portalMaterialInstance;
 
-	/* The max number of times a portal can recurse any portals. NOTE: Only target portal is supported for now. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Portal")
-	int recursionAmount;
-
 	/* Debug the duplicated camera position and rotation relative to the other portal by drawing debug cube based of scenecapture2D transform. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Portal|Debugging")
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Portal")
 	bool debugCameraTransform;
 
 private:
