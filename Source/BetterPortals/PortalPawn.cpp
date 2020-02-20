@@ -406,5 +406,31 @@ void APortalPawn::Interact()
 
 void APortalPawn::PortalTeleport(APortal* targetPortal)
 {
+	// Enter any further functionality to do to the player when teleporting...
+}
 
+bool APortalPawn::PortalTraceSingleExample(struct FHitResult& outHit, const FVector& start, const FVector& end, ECollisionChannel traceChannel, int maxPortalTrace)
+{
+	// Perform first trace.
+	GetWorld()->LineTraceSingleByChannel(outHit, start, end, traceChannel);
+
+	// If a portal was hit perform another trace from said portal with converted start and end positions.
+	if (outHit.bBlockingHit)
+	{
+		if (APortal* wasPortal = Cast<APortal>(outHit.Actor))
+		{
+			for (int i = 0; i < maxPortalTrace; i++)
+			{
+				FVector newStart = wasPortal->ConvertVectorToTarget(outHit.Location);
+				FVector newEnd = wasPortal->ConvertVectorToTarget(end);
+				GetWorld()->LineTraceSingleByChannel(outHit, newStart, newEnd, traceChannel);
+
+				// If another portal was hit continue otherwise exit.
+				if (!outHit.bBlockingHit || !Cast<APortal>(outHit.Actor)) break;
+			}
+		}
+	}
+
+	// Return if there was a blocking hit.
+	return outHit.bBlockingHit;
 }

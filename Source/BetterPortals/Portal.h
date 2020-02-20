@@ -137,7 +137,7 @@ public:
 
 	/* Convert a given velocity vector to the target portal. */
 	UFUNCTION(BlueprintCallable, Category = "Portal")
-	FVector ConvertVelocityToTarget(FVector velocity);
+	FVector ConvertVectorToTarget(FVector velocity);
 
 	/* Convert a given location and rotation to the target portal. */
 	UFUNCTION(BlueprintCallable, Category = "Portal")

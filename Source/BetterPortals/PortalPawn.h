@@ -405,4 +405,8 @@ public:
 
 	/* Ran from portal to a character when teleporting. Do any extra work in the player class after teleporting. */
 	void PortalTeleport(class APortal* targetPortal);
+
+	/* An example function showing how to set up traces with portals with a recursion amount which is how many times it can go through a portal. */
+	UFUNCTION(BlueprintCallable, Category = "Interaction")
+	bool PortalTraceSingleExample(struct FHitResult& outHit, const FVector& start, const FVector& end, ECollisionChannel traceChannel, int maxPortalTrace);
 };

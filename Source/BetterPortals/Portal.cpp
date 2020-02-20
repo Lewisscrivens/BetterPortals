@@ -30,6 +30,7 @@ APortal::APortal()
 	portalMesh = CreateDefaultSubobject<UStaticMeshComponent>("PortalMesh");
 	portalMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	portalMesh->SetupAttachment(RootComponent);
+	portalMesh->CastShadow = false; // Dont want it casting shadows.
 
 	// Setup portal overlap box for detecting actors.
 	portalBox = CreateDefaultSubobject<UBoxComponent>(TEXT("PortalBox"));
@@ -292,8 +293,8 @@ void APortal::TeleportObject(AActor* actor)
 
 	// Teleport the physics object. Teleport both position and relative velocity.
 	UPrimitiveComponent* primComp = Cast<UPrimitiveComponent>(actor->GetRootComponent());
-	FVector newLinearVelocity = ConvertVelocityToTarget(primComp->GetPhysicsLinearVelocity());
-	FVector newAngularVelocity = ConvertVelocityToTarget(primComp->GetPhysicsAngularVelocityInDegrees());
+	FVector newLinearVelocity = ConvertVectorToTarget(primComp->GetPhysicsLinearVelocity());
+	FVector newAngularVelocity = ConvertVectorToTarget(primComp->GetPhysicsAngularVelocityInDegrees());
 	FTransform convertedTrans = ConvertTransformToTarget(actor->GetActorLocation(), actor->GetActorRotation());
 	primComp->SetWorldLocationAndRotation(convertedTrans.GetLocation(), convertedTrans.GetRotation(), false, nullptr, ETeleportType::TeleportPhysics);
 	primComp->SetPhysicsLinearVelocity(newLinearVelocity);
@@ -317,7 +318,7 @@ bool APortal::IsInfront(FVector location)
 	return (dotProduct >= 0); // Returns true if the location is in-front of this portal.
 }
 
-FVector APortal::ConvertVelocityToTarget(FVector velocity)
+FVector APortal::ConvertVectorToTarget(FVector velocity)
 {
 	// Get pointer to target.
 	APortal* pTargetPortal = Cast<APortal>(targetPortal);
