@@ -154,10 +154,7 @@ void APortal::AddTrackedActor(AActor* actorToAdd)
 	// Create visual copy of the tracked actor.
 
 	// Create tracked actor struct.
-	// NOTE: If its the pawn track the camera otherwise track the root component...
-	FTrackedActor* track;
-	if (APortalPawn* isPawn = Cast<APortalPawn>(actorToAdd)) track = new FTrackedActor(isPawn->camera);
-	else track = new FTrackedActor(actorToAdd->GetRootComponent());
+	FTrackedActor* track = new FTrackedActor();
 	track->lastTrackedOrigin = actorToAdd->GetActorLocation();
 
 	// Add to tracked actors.
@@ -257,7 +254,7 @@ void APortal::UpdateTrackedActors()
 			// Update the positions for the duplicate tracked actors at the target portal.
 
 			// Check for when the actors origin passes to the other side of the portal between frames.
-			FVector currLocation = trackedActor->Value->trackedComp->GetComponentLocation();
+			FVector currLocation = trackedActor->Key->GetActorLocation();
 			if (IsInfront(trackedActor->Value->lastTrackedOrigin) && !IsInfront(currLocation) && LocationInsidePortal(currLocation))
 			{
 				// Teleport the actor.

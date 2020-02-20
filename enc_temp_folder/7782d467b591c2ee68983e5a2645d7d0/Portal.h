@@ -19,15 +19,13 @@ struct FTrackedActor
 public:
 
 	FVector lastTrackedOrigin;
-	USceneComponent* trackedComp;
 
 public:
 
 	/* Constructor. */
-	FTrackedActor(USceneComponent* trackingComponent)
+	FTrackedActor()
 	{
-		lastTrackedOrigin = trackingComponent->GetComponentLocation();
-		trackedComp = trackingComponent;
+		lastTrackedOrigin = FVector::ZeroVector;
 	}
 };
 
