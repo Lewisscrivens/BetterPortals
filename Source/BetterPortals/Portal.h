@@ -23,7 +23,14 @@ public:
 
 public:
 
-	/* Constructor. */
+	/* Default Constructor. */
+	FTrackedActor()
+	{
+		lastTrackedOrigin = FVector::ZeroVector;
+		trackedComp = nullptr;
+	}
+
+	/* Main Constructor. */
 	FTrackedActor(USceneComponent* trackingComponent)
 	{
 		lastTrackedOrigin = trackingComponent->GetComponentLocation();
