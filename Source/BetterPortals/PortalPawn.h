@@ -325,7 +325,7 @@ public:
 	/* Settings for the debugging features in the pawn class. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Movement")
 	FCharacterDebugSettings debugSettings;
-	
+
 private:
 
 	int jumpCount; // Track number of times jumped while in air.

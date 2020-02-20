@@ -328,7 +328,7 @@ FVector APortal::ConvertVelocityToTarget(FVector velocity)
 	flippedVel.Y = FVector::DotProduct(velocity, portalMesh->GetRightVector());
 	flippedVel.Z = FVector::DotProduct(velocity, portalMesh->GetUpVector());
 	FVector newVelocity = flippedVel.X * -pTargetPortal->portalMesh->GetForwardVector()
-					    + flippedVel.Y * -pTargetPortal->portalMesh->GetRightVector()
+					    + flippedVel.Y * pTargetPortal->portalMesh->GetRightVector()
 						+ flippedVel.Z * pTargetPortal->portalMesh->GetUpVector();
 	
 	// Return flipped vector for velocity.

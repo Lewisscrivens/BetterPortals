@@ -10,7 +10,7 @@ DECLARE_LOG_CATEGORY_EXTERN(LogPortal, Log, All);
 /* Checks and returns. */
 #define CHECK_DESTROY( LogCategory, Condition, Message, ...) if(Condition) { UE_LOG( LogCategory, Warning, TEXT(Message), ##__VA_ARGS__ ); Destroy(); return;}
 
-/* Structure to hold any information for an actor being tracked while overlapping the portal volume box. */
+/* Structure to hold important tracking information with each overlapping actor. */
 USTRUCT(BlueprintType)
 struct FTrackedActor
 {
@@ -18,12 +18,15 @@ struct FTrackedActor
 
 public:
 
-	AActor* trackedActor;
+	FVector lastTrackedOrigin;
 
 public:
 
 	/* Constructor. */
-	FTrackedActor();
+	FTrackedActor()
+	{
+		lastTrackedOrigin = FVector::ZeroVector;
+	}
 };
 
 /* Portal class to handle visualizing a portal to its target portal as well as teleportation of the players
@@ -67,7 +70,8 @@ private:
 	class APortalPawn* portalPawn; /* The portal pawn. */
 	class UCanvasRenderTarget2D* renderTarget; /* The portals render target texture. */
 	class UMaterialInstanceDynamic* portalMaterial; /* The portals dynamic material instance. */
-	TArray<FTrackedActor> trackedActors; /* Tracked actors that have entered the portal from the front but not yet passed through. */
+	TMap<AActor*, FTrackedActor*> trackedActors; /* Tracked actor map where each tracked actor has tracked settings like last location etc. */
+	int actorsBeingTracked; /* Number of actors currently being tracked. */
 
 	/* Function to teleport a given actor. */
 	void TeleportObject(AActor* actor);
@@ -114,10 +118,6 @@ public:
 	/* Removes a tracked actor and its duplicate. */
 	UFUNCTION(BlueprintCallable, Category = "Portal")
 	void RemoveTrackedActor(AActor* actorToRemove);
-	
-	/* Returns the tracking info. */
-	UFUNCTION(BlueprintCallable, Category = "Portal")
-	FTrackedActor GetTrackingInfo(AActor* actorToCheck);
 
 	/* Update the render texture for this portal using the scene capture component. */
 	UFUNCTION(BlueprintCallable, Category = "Portal")
@@ -135,11 +135,19 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Portal")
 	bool IsInfront(FVector location);
 
+	/* Convert a given velocity vector to the target portal. */
+	UFUNCTION(BlueprintCallable, Category = "Portal")
+	FVector ConvertVelocityToTarget(FVector velocity);
+
 	/* Convert a given location and rotation to the target portal. */
 	UFUNCTION(BlueprintCallable, Category = "Portal")
-	FTransform ConvertTransformToTarget(FVector location, FRotator rotation);
+	FTransform ConvertTransformToTarget(FVector location, FRotator rotation, bool flip = true);
 
 	/* Is a given location inside of this portals box. */
 	UFUNCTION(BlueprintCallable, Category = "Portal")
 	bool LocationInsidePortal(FVector location);
+
+	/* Number of actors currently being tracked and duplicated at the target portal. */
+	UFUNCTION(BlueprintCallable, Category = "Portal")
+	int GetNumberOfTrackedActors();
 };

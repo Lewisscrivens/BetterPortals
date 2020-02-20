@@ -24,7 +24,7 @@ FMatrix UPortalPlayer::GetCameraProjectionMatrix()
 {
 	FMatrix projMatrix;
 	FSceneViewProjectionData projData;
-	GetProjectionData(ViewportClient->Viewport, EStereoscopicPass::eSSP_FULL, projData);
+	GetProjectionData(ViewportClient->Viewport, EStereoscopicPass::eSSP_FULL, projData);//EStereoscopicPass::eSSP_RIGHT_EYE VR matrix copy...
 	projMatrix = projData.ProjectionMatrix;
 	return projMatrix;
 }
