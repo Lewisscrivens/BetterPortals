@@ -105,6 +105,9 @@ void APortalPawn::Tick(float DeltaTime)
 	// Update movement velocity.
 	characterSettings.linVelocity = playerCapsule->GetPhysicsLinearVelocity();
 	characterSettings.rotVelocity = playerCapsule->GetPhysicsAngularVelocityInDegrees();
+
+	// Update last location.
+	lastLocation = camera->GetComponentLocation();
 }
 
 void APortalPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -233,11 +236,7 @@ void APortalPawn::InteractAction(bool pressed)
 		FHitResult interactHit;
 		FVector startLocation = camera->GetComponentLocation();
 		FVector endLocation = startLocation + (camera->GetForwardVector() * characterSettings.interactionDistance);
-		FCollisionObjectQueryParams collObjParams;
-		collObjParams.AddObjectTypesToQuery(ECC_Interactable);
-		FCollisionQueryParams collParams;
-		collParams.AddIgnoredActor(this);
-		bool anything = GetWorld()->LineTraceSingleByObjectType(interactHit, startLocation, endLocation, collObjParams, collParams);
+		bool anything = PortalTraceSingleExample(interactHit, startLocation, endLocation, ECC_Interactable, 2.0f);
 		characterSettings.lastInteractHit = interactHit;
 
 		// If anything was hit run the interact function.
@@ -393,8 +392,10 @@ void APortalPawn::UpdateMouseMovement(float deltaTime)
 
 void APortalPawn::Interact()
 {
-	// Only pickup with physics handle if there is a component and it is simulating physics.
+	// Create component to grab here.
 	UPrimitiveComponent* primComp = characterSettings.lastInteractHit.GetComponent();
+
+	// Only pickup with physics handle if there is a component and it is simulating physics.
 	if (primComp != nullptr && primComp->IsSimulatingPhysics())
 	{
 		originalRelativeLocation = camera->GetComponentTransform().InverseTransformPositionNoScale(primComp->GetComponentLocation());
@@ -409,24 +410,50 @@ void APortalPawn::PortalTeleport(APortal* targetPortal)
 	// Enter any further functionality to do to the player when teleporting...
 }
 
-bool APortalPawn::PortalTraceSingleExample(struct FHitResult& outHit, const FVector& start, const FVector& end, ECollisionChannel traceChannel, int maxPortalTrace)
+bool APortalPawn::PortalTraceSingleExample(struct FHitResult& outHit, const FVector& start, const FVector& end, ECollisionChannel objectType, int maxPortalTrace)
 {
 	// Perform first trace.
-	GetWorld()->LineTraceSingleByChannel(outHit, start, end, traceChannel);
+	FCollisionObjectQueryParams collObjParams;
+	collObjParams.AddObjectTypesToQuery(ECC_Portal);
+	collObjParams.AddObjectTypesToQuery(objectType);
+	FCollisionQueryParams collParams;
+	collParams.AddIgnoredActor(this);
+	GetWorld()->LineTraceSingleByObjectType(outHit, start, end, collObjParams, collParams);
+
+	// If debug is enabled debug this line.
+	if (debugSettings.debugInteractionTrace)
+	{
+		FVector endToUse = end;
+		if (outHit.bBlockingHit) endToUse = outHit.Location;
+		DrawDebugLine(GetWorld(), start, endToUse, FColor::Red, false, 15.0f, 0.0f, 2.0f);
+	}
 
 	// If a portal was hit perform another trace from said portal with converted start and end positions.
 	if (outHit.bBlockingHit)
 	{
 		if (APortal* wasPortal = Cast<APortal>(outHit.Actor))
 		{
+			APortal* lastPortal = wasPortal;
 			for (int i = 0; i < maxPortalTrace; i++)
 			{
-				FVector newStart = wasPortal->ConvertVectorToTarget(outHit.Location);
-				FVector newEnd = wasPortal->ConvertVectorToTarget(end);
-				GetWorld()->LineTraceSingleByChannel(outHit, newStart, newEnd, traceChannel);
+				FVector newStart = wasPortal->ConvertLocationToPortal(outHit.Location, wasPortal, wasPortal->pTargetPortal);
+				FVector newEnd = wasPortal->ConvertLocationToPortal(end, wasPortal, wasPortal->pTargetPortal);
+				outHit = FHitResult();
 
+				// Ignore target portal to avoid returning its blocking hit result.
+				collParams.AddIgnoredActor(lastPortal->targetPortal);
+
+				// Line trace from portal exit.
+				GetWorld()->LineTraceSingleByObjectType(outHit, newStart, newEnd, collObjParams, collParams);
+	
+				// If debug is enabled debug each line trace repetition.
+				if (debugSettings.debugInteractionTrace)
+				{
+					DrawDebugLine(GetWorld(), newStart, newEnd, FColor::Red, false, 15.0f, 0.0f, 2.0f);
+				}
+	
 				// If another portal was hit continue otherwise exit.
-				if (!outHit.bBlockingHit || !Cast<APortal>(outHit.Actor)) break;
+				if (!Cast<APortal>(outHit.Actor)) return outHit.bBlockingHit;
 			}
 		}
 	}

@@ -11,6 +11,7 @@ DECLARE_LOG_CATEGORY_EXTERN(LogPortalPawn, Log, All);
 /* Macro definitions for collision channels. */
 #define ECC_Portal ECC_GameTraceChannel1
 #define ECC_Interactable ECC_GameTraceChannel2
+#define ECC_PortalBox ECC_GameTraceChannel3
 
 /* Enum for holding movement state of the player. */
 UENUM(BlueprintType)
@@ -280,12 +281,17 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Interaction")
 	bool debugMouseMovement;
 
+	/* Show visual line trace view of interaction trace. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Interaction")
+	bool debugInteractionTrace;
+
 public:
 
 	/* Default constructor. */
 	FCharacterDebugSettings()
 	{
 		debugMouseMovement = false;
+		debugInteractionTrace = false;
 	}
 };
 
@@ -325,6 +331,9 @@ public:
 	/* Settings for the debugging features in the pawn class. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Movement")
 	FCharacterDebugSettings debugSettings;
+
+	// Last frames camera location in the world.
+	FVector lastLocation;
 
 private:
 
@@ -408,5 +417,5 @@ public:
 
 	/* An example function showing how to set up traces with portals with a recursion amount which is how many times it can go through a portal. */
 	UFUNCTION(BlueprintCallable, Category = "Interaction")
-	bool PortalTraceSingleExample(struct FHitResult& outHit, const FVector& start, const FVector& end, ECollisionChannel traceChannel, int maxPortalTrace);
+	bool PortalTraceSingleExample(struct FHitResult& outHit, const FVector& start, const FVector& end, ECollisionChannel objectType, int maxPortalTrace);
 };

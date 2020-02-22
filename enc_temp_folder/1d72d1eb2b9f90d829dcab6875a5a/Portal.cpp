@@ -262,7 +262,10 @@ void APortal::UpdatePortalView()
 	portalCapture->bEnableClipPlane = true;
 	portalCapture->bOverride_CustomNearClippingPlane = true;
 	portalCapture->ClipPlaneNormal = pTargetPortal->portalMesh->GetForwardVector();
-	portalCapture->ClipPlaneBase = pTargetPortal->portalMesh->GetComponentLocation() - (portalCapture->ClipPlaneNormal * 1.0f);
+	
+	// Set clip plane 5 units behind portal so in VR if one eye goes through the portal it will not be noticeable.
+	// NOTE: In VR it might need to be adjusted even more.
+	portalCapture->ClipPlaneBase = pTargetPortal->portalMesh->GetComponentLocation() - (portalCapture->ClipPlaneNormal * 5.0f);
 
 	// Get the Projection Matrix from the players camera view settings.
 	UPortalPlayer* portalPlayer = Cast<UPortalPlayer>(portalController->GetLocalPlayer());
@@ -464,7 +467,6 @@ void APortal::CopyActor(AActor* actorToCopy)
 			UStaticMeshComponent* staticComp = (UStaticMeshComponent*)comp;
 			staticComp->SetCollisionResponseToChannel(ECC_PortalBox, ECR_Ignore);
 			staticComp->SetCollisionResponseToChannel(ECC_Interactable, ECR_Ignore);
-			staticComp->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);// Ignore pawn.
 			staticComp->SetSimulatePhysics(false);
 		}
 	}
