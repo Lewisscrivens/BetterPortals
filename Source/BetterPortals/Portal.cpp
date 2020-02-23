@@ -62,7 +62,6 @@ APortal::APortal()
     // NOTE: If performant portals is enabled in game mode portals will be deactivated until needed to be activated...
 	active = true;
 	initialised = false;
-	latePortalUpdate = true;
 	debugCameraTransform = false;
 	debugTrackedActors = false;
 	actorsBeingTracked = 0;
@@ -265,7 +264,6 @@ void APortal::UpdatePortalView()
 {
 	// Increase current frame count.
 	currentFrameCount++;
-	if (currentFrameCount > recursionAmount) currentFrameCount = 0;
 
 	// Get cameras post-processing settings.
 	portalCapture->PostProcessSettings = portalPawn->camera->PostProcessSettings;
@@ -289,41 +287,32 @@ void APortal::UpdatePortalView()
 	FVector newCameraLocation = ConvertLocationToPortal(playerCamera->GetComponentLocation(), this, pTargetPortal);
 	FRotator newCameraRotation = ConvertRotationToPortal(playerCamera->GetComponentRotation(), this, pTargetPortal);
 
-	// Update each portal a frame later than each other to prevent N^2 performance complexity.
-	if (latePortalUpdate)
-	{
-
-		
-	}
 	// Recurse backwards for the max number of recursions and render to the texture each time overlaying each portal view.
-	else
+	for (int i = recursionAmount; i >= 0; i--)
 	{
-		for (int i = recursionAmount; i >= 0; i--)
+		// Update location of the scene capture.
+		FVector recursiveCamLoc = newCameraLocation;
+		FRotator recursiveCamRot = newCameraRotation;
+		for (int p = 0; p < i; p++)
 		{
-			// Update location of the scene capture.
-			FVector recursiveCamLoc = newCameraLocation;
-			FRotator recursiveCamRot = newCameraRotation;
-			for (int p = 0; p < i; p++)
-			{
-				recursiveCamLoc = ConvertLocationToPortal(recursiveCamLoc, this, pTargetPortal);
-				recursiveCamRot = ConvertRotationToPortal(recursiveCamRot, this, pTargetPortal);
-			}
-			portalCapture->SetWorldLocationAndRotation(recursiveCamLoc, recursiveCamRot);
-
-			// Use-full for debugging convert transform to target function on the camera.
-			if (debugCameraTransform) DrawDebugBox(GetWorld(), recursiveCamLoc, FVector(10.0f), recursiveCamRot.Quaternion(), FColor::Red, false, 0.05f, 0.0f, 2.0f);
-
-			// Set portal to not be rendered if its the first recursion event.
-			// NOTE: Caps off the end so theres no visual glitches.
-			if (i == recursionAmount) portalMesh->SetVisibility(false);
-
-			// Update the portal scene capture to render it to the RT.
-			portalCapture->CaptureScene();
-
-			// Set portal to be rendered for next recursion.
-			if (i == recursionAmount) portalMesh->SetVisibility(true);
+			recursiveCamLoc = ConvertLocationToPortal(recursiveCamLoc, this, pTargetPortal);
+			recursiveCamRot = ConvertRotationToPortal(recursiveCamRot, this, pTargetPortal);
 		}
-	}	
+		portalCapture->SetWorldLocationAndRotation(recursiveCamLoc, recursiveCamRot);
+
+		// Use-full for debugging convert transform to target function on the camera.
+		if (debugCameraTransform) DrawDebugBox(GetWorld(), recursiveCamLoc, FVector(10.0f), recursiveCamRot.Quaternion(), FColor::Red, false, 0.05f, 0.0f, 2.0f);
+
+		// Set portal to not be rendered if its the first recursion event.
+		// NOTE: Caps off the end so theres no visual glitches.
+		if (i == recursionAmount) portalMesh->SetVisibility(false);
+
+		// Update the portal scene capture to render it to the RT.
+		portalCapture->CaptureScene();
+
+		// Set portal to be rendered for next recursion.
+		if (i == recursionAmount) portalMesh->SetVisibility(true);
+	}
 }
 
 void APortal::UpdateWorldOffset()
@@ -343,6 +332,7 @@ void APortal::UpdatePawnTracking()
 {
 	// Check for when the pawn has passed through this portal between frames.
 	FVector currLocation = portalPawn->camera->GetComponentLocation();
+	if (currLocation.ContainsNaN()) return;
 	FVector pointInterscetion;
 	FPlane portalPlane = FPlane(portalMesh->GetComponentLocation(), portalMesh->GetForwardVector());
 	bool passedThroughPlane = FMath::SegmentPlaneIntersection(portalPawn->lastLocation, currLocation, portalPlane, pointInterscetion);

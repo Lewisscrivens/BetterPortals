@@ -3,8 +3,6 @@
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
-#include "TimerManager.h"
-#include "GameFramework/Actor.h"
 
 DEFINE_LOG_CATEGORY(LogPortalGamemode);
 
@@ -15,7 +13,6 @@ ABetterPortalsGameModeBase::ABetterPortalsGameModeBase()
 
 	// Defaults.
 	performantPortals = true;
-	portalUpdateRate = 0.1f;
 }
 
 void ABetterPortalsGameModeBase::BeginPlay()
@@ -29,39 +26,52 @@ void ABetterPortalsGameModeBase::BeginPlay()
 	CHECK_DESTROY(LogPortalGamemode, !foundPawn, "Player portal pawn could not be found in the portal class %s.", *GetName());
 	pawn = foundPawn;
 
-	// Set off timer to update the portals in the world.
-	FTimerDelegate timer;
-	timer.BindUFunction(this, "UpdatePortals");
-	GetWorld()->GetTimerManager().SetTimer(portalsTimer, timer, portalUpdateRate, true);
+	// Get all portals in the scene.
+	for (TActorIterator<AActor> portal (GetWorld(), APortal::StaticClass()); portal; ++portal)
+	{
+		APortal* foundPortal = Cast<APortal>(*portal);
+		portals.Add(foundPortal);
+	}
 }
 
 void ABetterPortalsGameModeBase::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	// NOT IN USE USING TIMER INSTEAD.
+	// Run function to update the portals in the scene.
+	if (performantPortals && portals.Num() > 0)
+	{
+		UpdatePortals();
+	}
 }
 
 void ABetterPortalsGameModeBase::UpdatePortals()
 {
-	// Get all portals in the scene.
-	for (TActorIterator<AActor> portal(GetWorld(), APortal::StaticClass()); portal; ++portal)
+	// Loop through each portal until the closest max updates are found.
+	TArray<APortal*> portalsToUpdate;
+	for (APortal* portal : portals)
 	{
-		APortal* foundPortal = Cast<APortal>(*portal);
-
 		// Get portal info.
 		FVector portalLoc = portal->GetActorLocation();
 		FVector portalNorm = -1 * portal->GetActorForwardVector();
 
-		// TODO: Check for if the player is in-front also.
-		// Activate given portals based on if they was previously rendered.
-		if (portal->WasRecentlyRendered(0.01f))
+		// Reset Portals.
+		portal->SetActive(false);
+
+		// TODO:
+		// Find the next closest Portal when the player is Standing in front of.
+		// Find if the players camera is facing the portal also.
+		bool closest = false;
+		bool infront = false;
+		if (closest && infront)
 		{
-			foundPortal->SetActive(true);
+			portalsToUpdate.Add(portal);
 		}
-		else
-		{
-			foundPortal->SetActive(false);
-		}
+	}
+
+	// Update the found portals.
+	for (APortal* portal : portalsToUpdate)
+	{
+		portal->SetActive(true);
 	}
 }

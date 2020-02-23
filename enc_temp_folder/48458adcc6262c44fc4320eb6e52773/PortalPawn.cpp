@@ -251,31 +251,16 @@ void APortalPawn::InteractAction(bool pressed)
 	if (pressed)
 	{
 		// Perform interact line trace and fill relevant information in character settings.
-		// Doesn't support picking up through portals but the PortalTraceSingleExample can be used to achieve this.
 		FHitResult interactHit;
 		FVector startLocation = camera->GetComponentLocation();
 		FVector endLocation = startLocation + (camera->GetForwardVector() * characterSettings.interactionDistance);
-		FCollisionObjectQueryParams collObjParams;
-		collObjParams.AddObjectTypesToQuery(ECC_Interactable);
-		FCollisionQueryParams collParams;
-		collParams.AddIgnoredActor(this);
-		bool wentThroughPortal = GetWorld()->LineTraceSingleByObjectType(interactHit, startLocation, endLocation, collObjParams, collParams);
+		bool anything = PortalTraceSingleExample(interactHit, startLocation, endLocation, ECC_Interactable, 2.0f);
 		characterSettings.lastInteractHit = interactHit;
 
-		// If something was hit grab it with the physics handle.
-		if (interactHit.bBlockingHit)
+		// If anything was hit run the interact function.
+		if (anything)
 		{
-			// Create component to grab here.
-			UPrimitiveComponent* primComp = interactHit.GetComponent();
-
-			// Only pickup with physics handle if there is a component and it is simulating physics.
-			if (primComp != nullptr && primComp->IsSimulatingPhysics())
-			{
-				originalRelativeLocation = camera->GetComponentTransform().InverseTransformPositionNoScale(primComp->GetComponentLocation());
-				originalRelativeRotation = camera->GetComponentTransform().TransformRotation(primComp->GetComponentQuat()).Rotator();
-				physicsHandle->GrabComponentAtLocationWithRotation(primComp, NAME_None, primComp->GetComponentLocation(), primComp->GetComponentRotation());
-				primComp->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
-			}
+			Interact();
 		}
 	}
 	// Interact Action - Released
@@ -441,6 +426,21 @@ void APortalPawn::UpdateMouseMovement(float deltaTime)
 #endif
 }
 
+void APortalPawn::Interact()
+{
+	// Create component to grab here.
+	UPrimitiveComponent* primComp = characterSettings.lastInteractHit.GetComponent();
+
+	// Only pickup with physics handle if there is a component and it is simulating physics.
+	if (primComp != nullptr && primComp->IsSimulatingPhysics())
+	{
+		originalRelativeLocation = camera->GetComponentTransform().InverseTransformPositionNoScale(primComp->GetComponentLocation());
+		originalRelativeRotation = camera->GetComponentTransform().TransformRotation(primComp->GetComponentQuat()).Rotator();
+		physicsHandle->GrabComponentAtLocationWithRotation(primComp, NAME_None, primComp->GetComponentLocation(), primComp->GetComponentRotation());
+		primComp->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
+	}
+}
+
 void APortalPawn::PortalTeleport(APortal* targetPortal)
 {
 	// Enter any further functionality to do to the player when teleporting...
@@ -449,7 +449,6 @@ void APortalPawn::PortalTeleport(APortal* targetPortal)
 bool APortalPawn::PortalTraceSingleExample(struct FHitResult& outHit, const FVector& start, const FVector& end, ECollisionChannel objectType, int maxPortalTrace)
 {
 	// Perform first trace.
-	bool beenThroughPortal = false;
 	FCollisionObjectQueryParams collObjParams;
 	collObjParams.AddObjectTypesToQuery(ECC_Portal);
 	collObjParams.AddObjectTypesToQuery(objectType);
@@ -470,7 +469,6 @@ bool APortalPawn::PortalTraceSingleExample(struct FHitResult& outHit, const FVec
 	{
 		if (APortal* wasPortal = Cast<APortal>(outHit.Actor))
 		{
-			beenThroughPortal = true;
 			APortal* lastPortal = wasPortal;
 			for (int i = 0; i < maxPortalTrace; i++)
 			{
@@ -496,6 +494,6 @@ bool APortalPawn::PortalTraceSingleExample(struct FHitResult& outHit, const FVec
 		}
 	}
 
-	// Return if the trace passed through a portal in the world.
-	return beenThroughPortal;
+	// Return if there was a blocking hit.
+	return outHit.bBlockingHit;
 }

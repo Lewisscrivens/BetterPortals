@@ -21,24 +21,14 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Portal")
 	bool performantPortals;
 
-	/* Check for portals being rendered on screen every portalUpdateRate seconds. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Portal")
-	float portalUpdateRate;
-
 	/* Pointers to keep track of which portals to update. */
 	class APortalPawn* pawn;
-
-	/* Timer handle for the portals udpate function. */
-	FTimerHandle portalsTimer;
+	TArray<class APortal*> portals;
 
 public:
 
 	/* Constructor. */
 	ABetterPortalsGameModeBase();
-
-	/* Function to update portals in the world based off player location relative to each of them. */
-	UFUNCTION(Category = "Portals")
-	void UpdatePortals();
 	
 protected:
 
@@ -47,4 +37,7 @@ protected:
 
 	/* Frame. */
 	virtual void Tick(float DeltaTime) override;
+	
+	/* Function to update portals in the world based off player location relative to each of them. */
+	void UpdatePortals();
 };

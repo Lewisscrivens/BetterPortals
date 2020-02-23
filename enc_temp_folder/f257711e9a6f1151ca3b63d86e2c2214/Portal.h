@@ -114,12 +114,10 @@ public:
 	/* Portal class target portal. */
 	APortal* pTargetPortal;
 
-	/* Is this portal active? NOTE: Currently does nothing but is true when its being updated. */
-	bool active; 
-
 private:
 
 	bool initialised; /* Has begin play been ran. */
+	bool active; /* Is this portal active? NOTE: Currently does nothing but is true when its being updated. */
 	class APlayerController* portalController; /* The player controller. */
 	class APortalPawn* portalPawn; /* The portal pawn. */
 	class UCanvasRenderTarget2D* renderTarget; /* The portals render target texture. */
