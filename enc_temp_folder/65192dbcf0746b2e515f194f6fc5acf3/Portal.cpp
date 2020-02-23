@@ -97,13 +97,17 @@ void APortal::BeginPlay()
 	initialised = true;
 }
 
-void APortal::PostLoad()
+void APortal::PostInitializeComponents()
 {
-	Super::PostLoad();
+	Super::PostInitializeComponents();
 
-	// Bind the portals overlap events.
-	portalBox->OnComponentBeginOverlap.AddDynamic(this, &APortal::OnPortalOverlap);
-	portalBox->OnComponentEndOverlap.AddDynamic(this, &APortal::OnOverlapEnd);
+	// If playing game and is game world setup delegate bindings.
+	if (GetWorld() && GetWorld()->IsGameWorld())
+	{
+		// Bind the portals overlap events.
+		portalBox->OnComponentBeginOverlap.AddDynamic(this, &APortal::OnPortalOverlap);
+		portalBox->OnComponentEndOverlap.AddDynamic(this, &APortal::OnOverlapEnd);
+	}
 }
 
 void APortal::PostPhysicsTick(float DeltaTime)
@@ -213,7 +217,15 @@ void APortal::RemoveTrackedActor(AActor* actorToRemove)
 		{
 			// Also remove from duplicate map.
 			duplicateMap.Remove(isValid);
-			isValid->Destroy();
+		
+			// Destroy if it has not begun its destruction process.
+			if (isValid && isValid->IsValidLowLevelFast() && !isValid->IsPendingKillOrUnreachable())
+			{
+				if (UWorld* currWorld = GetWorld())
+				{
+					currWorld->DestroyActor(isValid);
+				}
+			}
 		}
 	}
 
@@ -262,10 +274,7 @@ void APortal::UpdatePortalView()
 	portalCapture->bEnableClipPlane = true;
 	portalCapture->bOverride_CustomNearClippingPlane = true;
 	portalCapture->ClipPlaneNormal = pTargetPortal->portalMesh->GetForwardVector();
-	
-	// Set clip plane 5 units behind portal so in VR if one eye goes through the portal it will not be noticeable.
-	// NOTE: In VR it might need to be adjusted even more.
-	portalCapture->ClipPlaneBase = pTargetPortal->portalMesh->GetComponentLocation() - (portalCapture->ClipPlaneNormal * 5.0f);
+	portalCapture->ClipPlaneBase = pTargetPortal->portalMesh->GetComponentLocation() - (portalCapture->ClipPlaneNormal * 1.0f);
 
 	// Get the Projection Matrix from the players camera view settings.
 	UPortalPlayer* portalPlayer = Cast<UPortalPlayer>(portalController->GetLocalPlayer());
@@ -467,6 +476,7 @@ void APortal::CopyActor(AActor* actorToCopy)
 			UStaticMeshComponent* staticComp = (UStaticMeshComponent*)comp;
 			staticComp->SetCollisionResponseToChannel(ECC_PortalBox, ECR_Ignore);
 			staticComp->SetCollisionResponseToChannel(ECC_Interactable, ECR_Ignore);
+			staticComp->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);// Ignore pawn.
 			staticComp->SetSimulatePhysics(false);
 		}
 	}

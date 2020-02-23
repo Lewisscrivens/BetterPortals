@@ -154,8 +154,8 @@ protected:
 	/* Level start. */
 	virtual void BeginPlay() override;
 
-	/* Post load. */
-	virtual void PostLoad() override;
+	/* Post initialization. */
+	virtual void PostInitializeComponents() override;
 
 	/* Post physics ticking function. */
 	void PostPhysicsTick(float DeltaTime);

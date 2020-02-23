@@ -97,13 +97,17 @@ void APortal::BeginPlay()
 	initialised = true;
 }
 
-void APortal::PostLoad()
+void APortal::PostInitializeComponents()
 {
-	Super::PostLoad();
+	Super::PostInitializeComponents();
 
-	// Bind the portals overlap events.
-	portalBox->OnComponentBeginOverlap.AddDynamic(this, &APortal::OnPortalOverlap);
-	portalBox->OnComponentEndOverlap.AddDynamic(this, &APortal::OnOverlapEnd);
+	// If playing game and is game world setup delegate bindings.
+	if (GetWorld() && GetWorld()->IsGameWorld())
+	{
+		// Bind the portals overlap events.
+		portalBox->OnComponentBeginOverlap.AddDynamic(this, &APortal::OnPortalOverlap);
+		portalBox->OnComponentEndOverlap.AddDynamic(this, &APortal::OnOverlapEnd);
+	}
 }
 
 void APortal::PostPhysicsTick(float DeltaTime)
@@ -213,7 +217,15 @@ void APortal::RemoveTrackedActor(AActor* actorToRemove)
 		{
 			// Also remove from duplicate map.
 			duplicateMap.Remove(isValid);
-			isValid->Destroy();
+		
+			// Destroy if it has not begun its destruction process.
+			if (isValid && isValid->IsValidLowLevelFast() && !isValid->IsPendingKillOrUnreachable())
+			{
+				if (UWorld* currWorld = GetWorld())
+				{
+					currWorld->DestroyActor(isValid);
+				}
+			}
 		}
 	}
 
@@ -396,7 +408,6 @@ void APortal::UpdateTrackedActors()
 			trackedActor->Value->lastTrackedOrigin = currLocation;
 		}
 
-		// Remove any teleported actors.
 		// NOTE: Do post to avoid errors in for loop.
 		for (AActor* actor : teleportedActors)
 		{
