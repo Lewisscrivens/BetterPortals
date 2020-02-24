@@ -5,8 +5,6 @@
 #include "EngineUtils.h"
 #include "TimerManager.h"
 #include "GameFramework/Actor.h"
-#include "PortalPawn.h"
-#include "Camera/CameraComponent.h"
 
 DEFINE_LOG_CATEGORY(LogPortalGamemode);
 
@@ -17,9 +15,7 @@ ABetterPortalsGameModeBase::ABetterPortalsGameModeBase()
 
 	// Defaults.
 	performantPortals = true;
-	checkDirection = false;
 	portalUpdateRate = 0.1f;
-	maxPortalRenderDistance = 500.0f;
 }
 
 void ABetterPortalsGameModeBase::BeginPlay()
@@ -54,27 +50,12 @@ void ABetterPortalsGameModeBase::UpdatePortals()
 		APortal* foundPortal = Cast<APortal>(*portal);
 
 		// Get portal info.
-		FVector portalLoc = foundPortal->GetActorLocation();
-		FVector portalNorm = -1 * foundPortal->GetActorForwardVector();
+		FVector portalLoc = portal->GetActorLocation();
+		FVector portalNorm = -1 * portal->GetActorForwardVector();
 
-		// Get the pawns facing direction.
-		FVector pawnLoc = pawn->GetActorLocation();
-		FVector pawnDirection = pawn->camera->GetForwardVector();
-		FVector portalDirection = portalLoc - pawnLoc;
-
-		// Get the angle difference in their directions. In Degrees.
-		float angleDifference = FMath::Abs(FMath::Acos(FVector::DotProduct(pawnDirection, portalNorm))) * (180.0f / PI);
-		UE_LOG(LogTemp, Warning, TEXT("Angle Diff: %f"), angleDifference);
-
-		// Get distance from portal.
-		float portalDistance = FMath::Abs(portalDirection.Size());
-		float angleDiffAmount = portalDistance <= 1000.0f ? 130.0f : 90.0f;
-
-		// Activate the portals based on distance, if the camera is in-front and facing...
-		// NOTE: This is only an example of how the portals can be made less of an impact to performance.
-		// NOTE: It would be better to find a way of checking if portals are being rendered.
-		// to take it further you could check recursions to see if the portal actually needs to recurse itself.
-		if (foundPortal->IsInfront(pawnLoc) && checkDirection ? angleDifference < angleDiffAmount : true && portalDistance <= maxPortalRenderDistance)
+		// TODO: Check for if the player is in-front also.
+		// Activate given portals based on if they was previously rendered.
+		if (portal->WasRecentlyRendered(GetWorld()->GetDeltaSeconds()))
 		{
 			foundPortal->SetActive(true);
 		}

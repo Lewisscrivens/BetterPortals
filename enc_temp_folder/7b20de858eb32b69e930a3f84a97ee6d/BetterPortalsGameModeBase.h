@@ -21,18 +21,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Portal")
 	bool performantPortals;
 
-	/* Should check the direction of the portals relative to the way the player is looking. 
-	 * NOTE: Doesn't work that well but with more work relative to how far right the player is its possible to improve this. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Portal")
-	bool checkDirection;
-
 	/* Check for portals being rendered on screen every portalUpdateRate seconds. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Portal")
 	float portalUpdateRate;
-
-	/* Max distance to render a portal at. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Portal")
-	float maxPortalRenderDistance;
 
 	/* Pointers to keep track of which portals to update. */
 	class APortalPawn* pawn;
