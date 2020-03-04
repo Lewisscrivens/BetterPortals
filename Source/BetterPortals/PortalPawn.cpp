@@ -11,6 +11,7 @@
 #include "DrawDebugHelpers.h"
 #include "TimerManager.h"
 #include "Portal.h"
+#include "Kismet/KismetMathLibrary.h"
 
 DEFINE_LOG_CATEGORY(LogPortalPawn);
 
@@ -53,6 +54,7 @@ APortalPawn::APortalPawn()
 	physicsHandle->bSoftLinearConstraint = true;
 	physicsHandle->bInterpolateTarget = true;
 	physicsHandle->InterpolationSpeed = 100.0f;
+	orientation = false;
 
 	// Setup component order.
 	RootComponent = playerCapsule;
@@ -95,27 +97,22 @@ void APortalPawn::Tick(float DeltaTime)
 	if (characterSettings.IsInputtingMouseMovement()) UpdateMouseMovement(DeltaTime);
 
 	// Update physics handle location if something is being held.
-	// If it is being held through a portal ensure it gets the correct holding location...
 	if (physicsHandle->GetGrabbedComponent() != nullptr)
 	{
+		// If it is being held through a portal ensure it gets the correct holding location...
+		// Not in use anymore, works but decided to just release if teleported while holding.
+		// UpdatePhysicsHandleOffset();
+
+		// Update handle offset.
 		FVector newLoc = camera->GetComponentTransform().TransformPositionNoScale(originalRelativeLocation);
 		FRotator newRot = camera->GetComponentTransform().TransformRotation(originalRelativeRotation.Quaternion()).Rotator();
-		FHitResult holdingHit;
-		FCollisionObjectQueryParams collObjParams;
-		collObjParams.AddObjectTypesToQuery(ECC_Portal);
-		FCollisionQueryParams collParams;
-		collParams.AddIgnoredActor(this);
-		bool anything = GetWorld()->LineTraceSingleByObjectType(holdingHit, camera->GetComponentLocation(), newLoc, collObjParams, collParams);
-		if (anything)
-		{
-			if (APortal* isAPortal = Cast<APortal>(holdingHit.GetActor()))
-			{
-				FVector newerLoc = isAPortal->ConvertLocationToPortal(newLoc, isAPortal, isAPortal->pTargetPortal);
-				FRotator newerRot = isAPortal->ConvertRotationToPortal(newRot, isAPortal, isAPortal->pTargetPortal);
-				physicsHandle->SetTargetLocationAndRotation(newerLoc, newerRot);
-			}
-		}
-		else physicsHandle->SetTargetLocationAndRotation(newLoc, newRot);
+		physicsHandle->SetTargetLocationAndRotation(newLoc, newRot);
+	}
+
+	// Update orientation if need be.
+	if (orientation)
+	{
+		ReturnToOrientation();
 	}
 
 	// Update movement velocity.
@@ -441,9 +438,44 @@ void APortalPawn::UpdateMouseMovement(float deltaTime)
 #endif
 }
 
+void APortalPawn::UpdatePhysicsHandleOffset()
+{
+	FVector newLoc = camera->GetComponentTransform().TransformPositionNoScale(originalRelativeLocation);
+	FRotator newRot = camera->GetComponentTransform().TransformRotation(originalRelativeRotation.Quaternion()).Rotator();
+	FHitResult holdingHit;
+	FCollisionObjectQueryParams collObjParams;
+	collObjParams.AddObjectTypesToQuery(ECC_Portal);
+	FCollisionQueryParams collParams;
+	collParams.AddIgnoredActor(this);
+	collParams.AddIgnoredActor(physicsHandle->GetGrabbedComponent()->GetOwner());
+	bool anything = GetWorld()->LineTraceSingleByObjectType(holdingHit, camera->GetComponentLocation(), newLoc, collObjParams, collParams);
+	if (anything)
+	{
+		if (APortal* isAPortal = Cast<APortal>(holdingHit.GetActor()))
+		{
+			FVector newerLoc = isAPortal->ConvertLocationToPortal(newLoc, isAPortal, isAPortal->pTargetPortal);
+			FRotator newerRot = isAPortal->ConvertRotationToPortal(newRot, isAPortal, isAPortal->pTargetPortal);
+			physicsHandle->SetTargetLocationAndRotation(newerLoc, newerRot);
+		}
+	}
+	else physicsHandle->SetTargetLocationAndRotation(newLoc, newRot);
+}
+
 void APortalPawn::PortalTeleport(APortal* targetPortal)
 {
-	// Enter any further functionality to do to the player when teleporting...
+	// Start timer to return the player to the correct orientation relative to the world.
+	orientationStart = GetWorld()->GetTimeSeconds();
+	orientationAtStart = playerCapsule->GetComponentRotation();
+	orientation = true;
+}
+
+void APortalPawn::ReturnToOrientation()
+{
+	float alpha = (GetWorld()->GetTimeSeconds() - orientationStart) / characterSettings.orientationCorrectionTime;
+	FRotator currentOrientation = playerCapsule->GetComponentRotation();
+	FRotator newOrientation = UKismetMathLibrary::RLerp(orientationAtStart, FRotator(0.0f, currentOrientation.Yaw, 0.0f), alpha, true);
+	playerCapsule->SetWorldRotation(newOrientation.Quaternion(), false, nullptr, ETeleportType::TeleportPhysics);
+	if (alpha >= 1.0f) orientation = false;
 }
 
 bool APortalPawn::PortalTraceSingleExample(struct FHitResult& outHit, const FVector& start, const FVector& end, ECollisionChannel objectType, int maxPortalTrace)

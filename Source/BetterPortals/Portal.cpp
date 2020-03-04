@@ -94,11 +94,6 @@ void APortal::BeginPlay()
 
 	// Begin play ran.
 	initialised = true;
-}
-
-void APortal::PostInitializeComponents()
-{
-	Super::PostInitializeComponents();
 
 	// If playing game and is game world setup delegate bindings.
 	if (GetWorld() && GetWorld()->IsGameWorld())
@@ -107,6 +102,12 @@ void APortal::PostInitializeComponents()
 		portalBox->OnComponentBeginOverlap.AddDynamic(this, &APortal::OnPortalOverlap);
 		portalBox->OnComponentEndOverlap.AddDynamic(this, &APortal::OnOverlapEnd);
 	}
+}
+
+void APortal::PostInitializeComponents()
+{
+	Super::PostInitializeComponents();
+
 }
 
 void APortal::PostPhysicsTick(float DeltaTime)
@@ -427,9 +428,21 @@ void APortal::TeleportObject(AActor* actor)
 	primComp->SetPhysicsAngularVelocityInDegrees(newAngularVelocity);
 
 	// If its a player handle any extra teleporting functionality in the player class.
-	if (APortalPawn* portalPawn = Cast<APortalPawn>(actor))
+	if (APortalPawn* isPawn = Cast<APortalPawn>(actor))
 	{
-		portalPawn->PortalTeleport(pTargetPortal);
+		isPawn->PortalTeleport(pTargetPortal);
+		isPawn->physicsHandle->ReleaseComponent();
+	}
+	else
+	{
+		// If the actor is grabbed by the pawn update the offset after teleporting.
+		if (UPrimitiveComponent* isGrabbing = portalPawn->physicsHandle->GetGrabbedComponent())
+		{
+			if (isGrabbing == (UPrimitiveComponent*)actor->GetRootComponent())
+			{
+				portalPawn->physicsHandle->ReleaseComponent();
+			}
+		}
 	}
 
 	// Update the portal view and world offset for the target portal.

@@ -47,9 +47,9 @@ public:
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = "Movement")
 		FHitResult lastGroundHit;
 
-	/* Max number of portals updates per frame. */
+	/* How fast to correct the players orientation after a teleport event. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Camera")
-		float maxPortalUpdate;
+		float orientationCorrectionTime;
 
 	/* Camera pitch amount */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Camera")
@@ -151,11 +151,11 @@ public:
 		throwForce = 10.0f;
 
 		// Camera default values.
-		maxPortalUpdate = 4.0f;
 		cameraPitch = 90.0f;
 		mouseSpeed = 1.0f;
 
 		// Setup default movement values.
+		orientationCorrectionTime = 0.8f;
 		standingHeight = 90.0f;
 		crouchingHeight = 60.0f;
 		movementSpeedMul = 6.0f;
@@ -346,6 +346,9 @@ private:
 	FCrouchLerp crouchLerp; // Current crouch info.
 	FVector originalRelativeLocation;
 	FRotator originalRelativeRotation;
+	FRotator orientationAtStart; // Rotation of the capsule at the start of re-orientation.
+	float orientationStart; // Start time of the orientation update func.
+	bool orientation;
 
 protected:
 	
@@ -419,8 +422,16 @@ public:
 	/* Update the pawns rotation and camera pitch based on mouse movement. */
 	void UpdateMouseMovement(float deltaTime);
 
+	/* Updates the offset from the player that a held physics object should be at. Checks if this offset needs translating to the other side of a portal.
+	 * Does work but not in use just decided to release the component if teleported through a portal. */
+	void UpdatePhysicsHandleOffset();
+
 	/* Ran from portal to a character when teleporting. Do any extra work in the player class after teleporting. */
 	void PortalTeleport(class APortal* targetPortal);
+
+	/* Timer function to return the player to the correct orientation after a teleport event from a portal class. */
+	UFUNCTION(Category = "Movement")
+	void ReturnToOrientation();
 
 	/* An example function showing how to set up traces with portals with a recursion amount which is how many times it can go through a portal.
 	 * Returns if it went through a portal during the trace. */

@@ -34,9 +34,12 @@ void ABetterPortalsGameModeBase::BeginPlay()
 	pawn = foundPawn;
 
 	// Set off timer to update the portals in the world.
-	FTimerDelegate timer;
-	timer.BindUFunction(this, "UpdatePortals");
-	GetWorld()->GetTimerManager().SetTimer(portalsTimer, timer, portalUpdateRate, true);
+	if (performantPortals)
+	{
+		FTimerDelegate timer;
+		timer.BindUFunction(this, "UpdatePortals");
+		GetWorld()->GetTimerManager().SetTimer(portalsTimer, timer, portalUpdateRate, true);
+	}
 }
 
 void ABetterPortalsGameModeBase::Tick(float DeltaTime)
@@ -74,7 +77,8 @@ void ABetterPortalsGameModeBase::UpdatePortals()
 		// NOTE: This is only an example of how the portals can be made less of an impact to performance.
 		// NOTE: It would be better to find a way of checking if portals are being rendered.
 		// to take it further you could check recursions to see if the portal actually needs to recurse itself.
-		if (foundPortal->IsInfront(pawnLoc) && checkDirection ? angleDifference < angleDiffAmount : true && portalDistance <= maxPortalRenderDistance)
+		bool looking = checkDirection ? angleDifference < angleDiffAmount : true;
+		if (foundPortal->IsInfront(pawnLoc) && looking && portalDistance <= maxPortalRenderDistance)
 		{
 			foundPortal->SetActive(true);
 		}
