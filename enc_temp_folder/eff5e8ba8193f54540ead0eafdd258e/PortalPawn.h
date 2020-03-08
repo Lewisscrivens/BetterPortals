@@ -163,7 +163,7 @@ public:
 		mouseSpeed = 1.0f;
 
 		// Setup default movement values.
-		orientationCorrectionTime = 1.8f;
+		orientationCorrectionTime = 0.8f;
 		standingHeight = 90.0f;
 		crouchingHeight = 60.0f;
 		movementSpeedMul = 6.0f;
