@@ -95,6 +95,9 @@ void APortal::BeginPlay()
 	// Begin play ran.
 	initialised = true;
 
+	// Init last pawn location.
+	lastPawnLoc = portalPawn->camera->GetComponentLocation();
+
 	// If playing game and is game world setup delegate bindings.
 	if (GetWorld() && GetWorld()->IsGameWorld())
 	{
@@ -115,8 +118,10 @@ void APortal::PostPhysicsTick(float DeltaTime)
 	// If the portal is currently active.
 	if (active)
 	{
-		// Loop through tracked actors and update the target portal relative to the actors locations and rotations.
+		// Check if the pawn has passed through this portal.
 		UpdatePawnTracking();
+
+		// Update tracked actors post physics...
 		UpdateTrackedActors();
 	}
 }
@@ -155,7 +160,7 @@ void APortal::OnPortalOverlap(UPrimitiveComponent* portalMeshHit, AActor* overla
 	if (overlappedRootComponent && overlappedRootComponent->IsSimulatingPhysics())
 	{
 		// Ensure that the item thats entering the portal is in-front.
-		if (!trackedActors.Contains(overlappedActor) && IsInfront(portalHit.Location))
+		if (!trackedActors.Contains(overlappedActor) && IsInfront(overlappedRootComponent->GetComponentLocation()))
 		{
 			AddTrackedActor(overlappedActor);
 		}
@@ -190,8 +195,7 @@ void APortal::AddTrackedActor(AActor* actorToAdd)
 	// Create tracked actor struct.
 	// NOTE: If its the pawn track the camera otherwise track the root component...
 	FTrackedActor* track;
-	if (APortalPawn* isPawn = Cast<APortalPawn>(actorToAdd)) track = new FTrackedActor(isPawn->camera);
-	else track = new FTrackedActor(actorToAdd->GetRootComponent());
+	track = new FTrackedActor(actorToAdd->GetRootComponent());
 	track->lastTrackedOrigin = actorToAdd->GetActorLocation();
 
 	// Add to tracked actors.
@@ -210,24 +214,8 @@ void APortal::RemoveTrackedActor(AActor* actorToRemove)
 	// Ensure the actor is not null.
 	if (actorToRemove == nullptr) return;
 
-	// Destroy visual copy of the tracked actor.
-	if (trackedActors.FindRef(actorToRemove))
-	{
-		if (AActor* isValid = trackedActors.FindRef(actorToRemove)->trackedDuplicate)
-		{
-			// Also remove from duplicate map.
-			duplicateMap.Remove(isValid);
-		
-			// Destroy if it has not begun its destruction process.
-			if (isValid && isValid->IsValidLowLevelFast() && !isValid->IsPendingKillOrUnreachable())
-			{
-				if (UWorld* currWorld = GetWorld())
-				{
-					currWorld->DestroyActor(isValid);
-				}
-			}
-		}
-	}
+	// Delete the copy if there is one.
+	DeleteCopy(actorToRemove);
 
 	// Remove tracked actor.
 	trackedActors.Remove(actorToRemove);
@@ -336,21 +324,22 @@ void APortal::UpdatePawnTracking()
 	if (currLocation.ContainsNaN()) return;
 	FVector pointInterscetion;
 	FPlane portalPlane = FPlane(portalMesh->GetComponentLocation(), portalMesh->GetForwardVector());
-	bool passedThroughPlane = FMath::SegmentPlaneIntersection(portalPawn->lastLocation, currLocation, portalPlane, pointInterscetion);
+	bool passedThroughPlane = FMath::SegmentPlaneIntersection(lastPawnLoc, currLocation, portalPlane, pointInterscetion);
 	FVector relativeIntersection = portalMesh->GetComponentTransform().InverseTransformPositionNoScale(pointInterscetion);
 	FVector portalSize = portalBox->GetScaledBoxExtent();// NOTE: Ensure portal box is setup correctly for this to work.
 	bool passedWithinPortal = FMath::Abs(relativeIntersection.Z) <= portalSize.Z &&
 							  FMath::Abs(relativeIntersection.Y) <= portalSize.Y;
-	
+
 	// If the pawn has passed through the plane within the portals boundaries teleport.
-	if (passedThroughPlane && passedWithinPortal)
+	// Make sure the pawn has passed through the portal the correct way before teleporting.
+	if (passedThroughPlane && passedWithinPortal && IsInfront(lastPawnLoc))
 	{
 		// Teleport the actor.
 		TeleportObject(portalPawn);
-
-		// Remove the pawn from tracked actors if inside.
-		if (trackedActors.Contains(portalPawn)) RemoveTrackedActor(portalPawn);
 	}
+
+	// Last pawn location.
+	lastPawnLoc = portalPawn->camera->GetComponentLocation();
 }
 
 void APortal::UpdateTrackedActors()
@@ -368,12 +357,10 @@ void APortal::UpdateTrackedActors()
 				FVector convertedLoc = ConvertLocationToPortal(trackedActor->Key->GetActorLocation(), this, pTargetPortal);
 				FRotator convertedRot = ConvertRotationToPortal(trackedActor->Key->GetActorRotation(), this, pTargetPortal);
 				isValid->SetActorLocationAndRotation(convertedLoc, convertedRot); 
-				// Duplicates are static and should disable physics.
-				// NOTE: Location updates are driven through root components the way the code is set out atm.
 			}
 
 			// If its the player skip this next part as its handled in UpdatePawnTracking.
-			// NOTE: Moved into its own function as the overlap events was effecting valid teleporting on the pawn.
+			// NOTE: Still want to track the actor and position duplicate mesh...
 			if (APortalPawn* isPlayer = Cast<APortalPawn>(trackedActor->Key)) continue;
 
 			// Check for when the actors origin passes to the other side of the portal between frames.
@@ -400,9 +387,14 @@ void APortal::UpdateTrackedActors()
 		}
 
 		// NOTE: Do post to avoid errors in for loop.
+		// Add to tracked actors of other portal after teleported.
 		for (AActor* actor : teleportedActors)
 		{
-			if (trackedActors.Contains(actor)) RemoveTrackedActor(actor);
+			if (trackedActors.Contains(actor))
+			{
+				RemoveTrackedActor(actor);
+				pTargetPortal->AddTrackedActor(actor);
+			}
 		}
 	}	
 }
@@ -448,6 +440,29 @@ void APortal::TeleportObject(AActor* actor)
 	// Update the portal view and world offset for the target portal.
 	pTargetPortal->UpdateWorldOffset();
 	pTargetPortal->UpdatePortalView();
+	pTargetPortal->lastPawnLoc = portalPawn->camera->GetComponentLocation();
+}
+
+void APortal::DeleteCopy(AActor* actorToDelete)
+{
+	// Destroy visual copy of the tracked actor.
+	if (trackedActors.FindRef(actorToDelete))
+	{
+		if (AActor* isValid = trackedActors.FindRef(actorToDelete)->trackedDuplicate)
+		{
+			// Also remove from duplicate map.
+			duplicateMap.Remove(isValid);
+
+			// Destroy if it has not begun its destruction process.
+			if (isValid && isValid->IsValidLowLevelFast() && !isValid->IsPendingKillOrUnreachable())
+			{
+				if (UWorld* currWorld = GetWorld())
+				{
+					currWorld->DestroyActor(isValid);
+				}
+			}
+		}
+	}
 }
 
 void APortal::CopyActor(AActor* actorToCopy)
@@ -497,8 +512,8 @@ void APortal::CopyActor(AActor* actorToCopy)
 
 bool APortal::IsInfront(FVector location)
 {
-	FPlane plane = FPlane(portalMesh->GetComponentLocation(), portalMesh->GetForwardVector());
-	float dotProduct = plane.PlaneDot(location);
+	FVector direction = (location - GetActorLocation()).GetSafeNormal();
+	float dotProduct = FVector::DotProduct(direction, GetActorForwardVector());
 	return (dotProduct >= 0); // Returns true if the location is in-front of this portal.
 }
 

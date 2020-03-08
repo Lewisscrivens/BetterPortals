@@ -3,15 +3,11 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "GameFramework/Pawn.h"
+#include "HelperMacros.h"
 #include "PortalPawn.generated.h"
 
 /* Logging category for this class. */
 DECLARE_LOG_CATEGORY_EXTERN(LogPortalPawn, Log, All);
-
-/* Macro definitions for collision channels. */
-#define ECC_Portal ECC_GameTraceChannel1
-#define ECC_Interactable ECC_GameTraceChannel2
-#define ECC_PortalBox ECC_GameTraceChannel3
 
 /* Enum for holding movement state of the player. */
 UENUM(BlueprintType)
@@ -74,6 +70,18 @@ public:
 	/* Movement dampening force for removing too much force and acceleration being added to the player. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Movement")
 		float movementDragMul;
+
+	/* The up force multiplier to be applied while grounded and moving. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Movement")
+		float upForceMultiplier;
+
+	/* The maximum up force multiplier to be applied while grounded and moving. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Movement")
+		float maxUpForce;
+
+	/* Distance to look for the floor at the base of the characters capsule. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Movement")
+		float groundCheckDistance;
 
 	/*  Movement speed for air movement split into X and Y movement for different forces for strafing. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Movement")
@@ -147,8 +155,8 @@ public:
 	FCharacterSettings()
 	{
 		// Setup default interaction values.
-		interactionDistance = 150.0f;
-		throwForce = 10.0f;
+		interactionDistance = 300.0f;
+		throwForce = 5.0f;
 
 		// Camera default values.
 		cameraPitch = 90.0f;
@@ -160,6 +168,8 @@ public:
 		crouchingHeight = 60.0f;
 		movementSpeedMul = 6.0f;
 		movementDragMul = 1.5f;
+		upForceMultiplier = 0.8f;
+		maxUpForce = 10.0f;
 		airSpeed = FVector2D(60.0f, 100.0f);
 		walkSpeed = 220.0f;
 		runSpeed = 300.0f;
@@ -167,6 +177,7 @@ public:
 		crouchTime = 0.2f;
 		jumpForce = 20.0f;
 		mass = 50.0f;
+		groundCheckDistance = 20.0f;
 		currentMovementSpeed = walkSpeed;
 		currentMovementState = EMovementState::WALKING; 
 		doubleJump = false;
@@ -290,6 +301,10 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Interaction")
 	bool debugInteractionTrace;
 
+	/* Show visual line trace view of the ground check line trace looking for channel ECC_Pawn blocking.... */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Interaction")
+	bool debugGroundTrace;
+
 public:
 
 	/* Default constructor. */
@@ -297,6 +312,7 @@ public:
 	{
 		debugMouseMovement = false;
 		debugInteractionTrace = false;
+		debugGroundTrace = false;
 	}
 };
 
@@ -345,6 +361,7 @@ private:
 	int jumpCount; // Track number of times jumped while in air.
 	FCrouchLerp crouchLerp; // Current crouch info.
 	FVector originalRelativeLocation;
+	FVector lastDirection;
 	FRotator originalRelativeRotation;
 	FRotator orientationAtStart; // Rotation of the capsule at the start of re-orientation.
 	float orientationStart; // Start time of the orientation update func.

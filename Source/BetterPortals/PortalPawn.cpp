@@ -18,6 +18,7 @@ DEFINE_LOG_CATEGORY(LogPortalPawn);
 APortalPawn::APortalPawn()
 {
 	PrimaryActorTick.bCanEverTick = true;// Tick enabled.
+	PrimaryActorTick.TickGroup = ETickingGroup::TG_PostPhysics;
 
 	// Create sub-components.
 	playerMesh = CreateDefaultSubobject<USkeletalMeshComponent>("Char");
@@ -27,13 +28,9 @@ APortalPawn::APortalPawn()
 	// Setup movement capsule around the player.
 	playerCapsule = CreateDefaultSubobject<UCapsuleComponent>("Capsule");
 	playerCapsule->SetCollisionObjectType(ECC_Pawn);
-	playerCapsule->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-	playerCapsule->SetCollisionResponseToAllChannels(ECR_Block);
-	playerCapsule->SetCollisionResponseToChannel(ECC_Visibility, ECR_Ignore);
-	playerCapsule->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
+	playerCapsule->SetCollisionProfileName("PortalPawn");
 	playerCapsule->SetCapsuleHalfHeight(characterSettings.standingHeight);
 	playerCapsule->SetCapsuleRadius(40.0f);
-	playerCapsule->SetMassOverrideInKg(NAME_None, characterSettings.mass);
 	playerCapsule->SetSimulatePhysics(true);
 
 	// Setup camera holding component for rotation.
@@ -71,6 +68,9 @@ void APortalPawn::BeginPlay()
 	// Ensure standing height is correct.
 	playerCapsule->SetCapsuleHalfHeight(characterSettings.standingHeight);
 
+	// Setup mass override.
+	playerCapsule->SetMassOverrideInKg(NAME_None, characterSettings.mass);
+
 	// IMPORTANT BUG FIXES FOR PHYSICS LOCKING OF DIFFERENT AXIS.
 	FVector intertia = playerCapsule->BodyInstance.GetBodyInertiaTensor();
 	intertia.Z = 1000.0f; // Override Yaw intertia.
@@ -92,6 +92,10 @@ void APortalPawn::Tick(float DeltaTime)
 	// Check ground to update ground values.
 	GroundCheck();
 
+	// Update orientation if need be.
+	// NOTE: Apply this before any user input that will apply movement through rotation...
+	if (orientation) ReturnToOrientation();
+
 	// Check should update movement before updating.
 	if (characterSettings.IsInputtingMovement()) UpdateMovement(DeltaTime);
 	if (characterSettings.IsInputtingMouseMovement()) UpdateMouseMovement(DeltaTime);
@@ -99,20 +103,10 @@ void APortalPawn::Tick(float DeltaTime)
 	// Update physics handle location if something is being held.
 	if (physicsHandle->GetGrabbedComponent() != nullptr)
 	{
-		// If it is being held through a portal ensure it gets the correct holding location...
-		// Not in use anymore, works but decided to just release if teleported while holding.
-		// UpdatePhysicsHandleOffset();
-
 		// Update handle offset.
 		FVector newLoc = camera->GetComponentTransform().TransformPositionNoScale(originalRelativeLocation);
 		FRotator newRot = camera->GetComponentTransform().TransformRotation(originalRelativeRotation.Quaternion()).Rotator();
 		physicsHandle->SetTargetLocationAndRotation(newLoc, newRot);
-	}
-
-	// Update orientation if need be.
-	if (orientation)
-	{
-		ReturnToOrientation();
 	}
 
 	// Update movement velocity.
@@ -152,12 +146,15 @@ void APortalPawn::JumpAction(bool pressed)
 	if (pressed)
 	{
 		// If double jump is enabled and only jumped once up to now allow another jump mid air or if the character is grounded.
-		if (characterSettings.doubleJump ? jumpCount < 1 || characterSettings.IsGrounded() : characterSettings.IsGrounded())
+		if (characterSettings.doubleJump ? jumpCount <= 1 || characterSettings.IsGrounded() : characterSettings.IsGrounded())
 		{
 			FVector newVel = playerCapsule->GetPhysicsLinearVelocity();
 			newVel.Z = 0.0f;// Zero out the capsule velocity in the Z direction to ensure upwards force feels the same when pressed.
 			playerCapsule->SetPhysicsLinearVelocity(newVel);
-			playerCapsule->AddImpulse(1000.0f * characterSettings.jumpForce * playerCapsule->GetUpVector());
+
+			// Add impulse upwards and towards the direction the player was moving.
+			FVector jumpDirection = (playerCapsule->GetUpVector() + FVector(characterSettings.movementDir.X / -2, characterSettings.movementDir.Y / 2, 0.0f)).GetSafeNormal();
+			playerCapsule->AddImpulse(1000.0f * characterSettings.jumpForce * jumpDirection);
 			jumpCount++;
 		}
 	}
@@ -259,6 +256,20 @@ void APortalPawn::InteractAction(bool pressed)
 		bool wentThroughPortal = GetWorld()->LineTraceSingleByObjectType(interactHit, startLocation, endLocation, collObjParams, collParams);
 		characterSettings.lastInteractHit = interactHit;
 
+		// If debug is enabled debug what happened with the interaction trace.
+		if (debugSettings.debugInteractionTrace)
+		{
+			if (interactHit.bBlockingHit)
+			{
+				DrawDebugLine(GetWorld(), interactHit.TraceStart, interactHit.Location, FColor::Green, false, 10.0f, 0.0f, 1.0f);
+				DrawDebugPoint(GetWorld(), interactHit.Location, 10.0f, FColor::Red, false, 10.0f, 0.0f);
+			}
+			else
+			{
+				DrawDebugLine(GetWorld(), startLocation, endLocation, FColor::Red, false, 10.0f, 0.0f, 1.0f);
+			}
+		}
+
 		// If something was hit grab it with the physics handle.
 		if (interactHit.bBlockingHit)
 		{
@@ -337,9 +348,22 @@ bool APortalPawn::GroundCheck()
 	collParams.AddIgnoredActor(this);
 	FVector capsuleBottom = playerCapsule->GetComponentLocation();
 	capsuleBottom.Z -= characterSettings.GetCurrentMovementState() == EMovementState::CROUCHING ? characterSettings.crouchingHeight : characterSettings.standingHeight;
-	GetWorld()->LineTraceSingleByChannel(groundHit, capsuleBottom, capsuleBottom - (playerCapsule->GetUpVector() * 2.0f),//<-- Ground trace distance
-		ECC_Pawn, collParams);
+	GetWorld()->LineTraceSingleByChannel(groundHit, capsuleBottom, capsuleBottom - (playerCapsule->GetUpVector() * characterSettings.groundCheckDistance), ECC_Pawn, collParams);
 	characterSettings.lastGroundHit = groundHit;
+
+	// If debugging is enabled for the ground check draw it on screen.
+	if (debugSettings.debugGroundTrace)
+	{
+		if (groundHit.bBlockingHit)
+		{
+			DrawDebugLine(GetWorld(), groundHit.TraceStart, groundHit.Location, FColor::Green, false, 0.05f, 0.0f, 0.5f);
+			DrawDebugPoint(GetWorld(), groundHit.Location, 5.0f, FColor::Red, false, 0.05f, 0.0f);
+		}
+		else
+		{
+			DrawDebugLine(GetWorld(), groundHit.TraceStart, groundHit.TraceEnd, FColor::Red, false, 0.05f, 0.0f, 0.5f);
+		}
+	}
 
 	// Act on the character being grounded or in the air.
 	if (groundHit.bBlockingHit)
@@ -373,7 +397,10 @@ void APortalPawn::UpdateMovement(float deltaTime)
 	currentForce.Z = 0.0f;
 
 	// Get intended direction from input and current camera forward rotation.
+	// NOTE: Rotate through rotator function to avoid lerping the long way round...
 	FVector direction = FVector(characterSettings.movementDir.X, -characterSettings.movementDir.Y, 0.0f);
+		//UKismetMathLibrary::RInterpTo(lastDirection.Rotation(), FVector(characterSettings.movementDir.X, -characterSettings.movementDir.Y, 0.0f).Rotation(), deltaTime, 5.0f).Vector();
+	lastDirection = direction;
 
 	// Multiply direction by current movement speed if on ground use groundSpeed and if in air use airSpeed.
 	if (characterSettings.IsGrounded()) direction *= (characterSettings.movementSpeedMul * characterSettings.GetCurrentMovementSpeed());
@@ -384,7 +411,7 @@ void APortalPawn::UpdateMovement(float deltaTime)
 									 characterSettings.airSpeed.Y * characterSettings.movementSpeedMul, 0.0f);
 
 		// Multiply new speed along direction vector.
-		direction *= airSpeed3D;
+		direction *= airSpeed3D;	
 	}
 
 	// Rotate the directional force in the camera facing direction.
@@ -397,10 +424,13 @@ void APortalPawn::UpdateMovement(float deltaTime)
 	FVector dragForce = currentForce * characterSettings.movementDragMul;
 	force -= dragForce;
 
+	// If on the ground add upwards force also to help going up slopes.
+	if (characterSettings.lastGroundHit.bBlockingHit) force.Z = (characterSettings.upForceMultiplier * 0.01f) * (55000.0f - (characterSettings.linVelocity.Z * characterSettings.maxUpForce));
+
 	//  NOTE: Fix too much force being added when moving vertically.
 	if (characterSettings.movementDir.X != 0 && characterSettings.movementDir.Y != 0) force *= 0.7f;
 
-	// Apply movement through physics to the capsule.
+	// Apply movement.
 	playerCapsule->AddForce(force / deltaTime);
 
 	// Remove any yaw velocity.
@@ -463,6 +493,9 @@ void APortalPawn::UpdatePhysicsHandleOffset()
 
 void APortalPawn::PortalTeleport(APortal* targetPortal)
 {
+	// If the target portal is at the same orientation upwards as its target then return as orientation does not need to be adjusted.
+	if (targetPortal->pTargetPortal->GetActorUpVector() == targetPortal->GetActorUpVector()) return;
+
 	// Start timer to return the player to the correct orientation relative to the world.
 	orientationStart = GetWorld()->GetTimeSeconds();
 	orientationAtStart = playerCapsule->GetComponentRotation();
@@ -471,6 +504,7 @@ void APortalPawn::PortalTeleport(APortal* targetPortal)
 
 void APortalPawn::ReturnToOrientation()
 {
+	// TODO: MAKE SO ITS NOT SHIT.
 	float alpha = (GetWorld()->GetTimeSeconds() - orientationStart) / characterSettings.orientationCorrectionTime;
 	FRotator currentOrientation = playerCapsule->GetComponentRotation();
 	FRotator newOrientation = UKismetMathLibrary::RLerp(orientationAtStart, FRotator(0.0f, currentOrientation.Yaw, 0.0f), alpha, true);
@@ -515,12 +549,6 @@ bool APortalPawn::PortalTraceSingleExample(struct FHitResult& outHit, const FVec
 
 				// Line trace from portal exit.
 				GetWorld()->LineTraceSingleByObjectType(outHit, newStart, newEnd, collObjParams, collParams);
-	
-				// If debug is enabled debug each line trace repetition.
-				if (debugSettings.debugInteractionTrace)
-				{
-					DrawDebugLine(GetWorld(), newStart, newEnd, FColor::Red, false, 15.0f, 0.0f, 2.0f);
-				}
 	
 				// If another portal was hit continue otherwise exit.
 				if (!Cast<APortal>(outHit.Actor)) return outHit.bBlockingHit;

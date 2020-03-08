@@ -2,13 +2,11 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "HelperMacros.h"
 #include "Portal.generated.h"
 
 /* Logging category for this class. */
 DECLARE_LOG_CATEGORY_EXTERN(LogPortal, Log, All);
-
-/* Checks and returns. */
-#define CHECK_DESTROY( LogCategory, Condition, Message, ...) if(Condition) { UE_LOG( LogCategory, Warning, TEXT(Message), ##__VA_ARGS__ ); Destroy(); return;}
 
 /* Structure to hold important tracking information with each overlapping actor. */
 USTRUCT(BlueprintType)
@@ -80,7 +78,9 @@ public:
 	UPROPERTY(BlueprintReadWrite, VisibleAnywhere, Category = "Portal")
 	class UStaticMeshComponent* portalMesh;
 
-	/* Box overlap component for teleporting actors. */
+	/* Box overlap component for teleporting actors. 
+	 * NOTE: Used instead of overlaps with the portalMesh because the physics doesn't call overlaps if the mesh passed through something that doesn't block.
+	 *       This also still happens with CCD enabled as its mainly for blocking physics between frames not calling overlaps... */
 	UPROPERTY(BlueprintReadWrite, VisibleAnywhere, Category = "Portal")
 	class UBoxComponent* portalBox;
 
@@ -129,9 +129,13 @@ private:
 	TMap<AActor*, AActor*> duplicateMap; /* Map to find an original actor from a tracked duplicate actor from a hit result for example on a duplicate. */
 	int actorsBeingTracked; /* Number of actors currently being tracked. */
 	int currentFrameCount; /* Frame count for updating the portals one frame late. */
+	FVector lastPawnLoc; /* The pawns last tracked location for calculating when to teleport the player. */
 
 	/* Function to teleport a given actor. */
 	void TeleportObject(AActor* actor);
+
+	/* Deletes a copied version of another actor. */
+	void DeleteCopy(AActor* actorToDelete);
 
 	/* copies a given actors static mesh root component and sets it in the tracked actor struct.
 	 * NOTE: Only static meshes are duplicated but this is easily added. */
