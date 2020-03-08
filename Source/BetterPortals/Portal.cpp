@@ -202,12 +202,26 @@ void APortal::OnPortalBoxOverlapEnd(UPrimitiveComponent* portalMeshHit, AActor* 
 
 void APortal::OnPortalMeshOverlapStart(UPrimitiveComponent* portalMeshHit, AActor* overlappedActor, UPrimitiveComponent* overlappedComp, int32 otherBodyIndex, bool fromSweep, const FHitResult& portalHit)
 {
-
+	// Unhide the actor once its overlapping with the portal itself.
+	if (trackedActors.Contains(overlappedActor))
+	{
+		if (AActor* hasDuplicate = trackedActors.FindRef(overlappedActor)->trackedDuplicate)
+		{
+			HideActor(hasDuplicate, false);
+		}
+	}
 }
 
 void APortal::OnPortalMeshOverlapEnd(UPrimitiveComponent* portalMeshHit, AActor* overlappedActor, UPrimitiveComponent* overlappedComp, int32 otherBodyIndex)
 {
-
+	// Hide the actor once its ended its overlap with the portal by exiting it not passing through it.
+	if (trackedActors.Contains(overlappedActor))
+	{
+		if (AActor* hasDuplicate = trackedActors.FindRef(overlappedActor)->trackedDuplicate)
+		{
+			HideActor(hasDuplicate);
+		}
+	}
 }
 
 bool APortal::IsActive()
@@ -259,14 +273,14 @@ void APortal::RemoveTrackedActor(AActor* actorToRemove)
 	if (debugTrackedActors) UE_LOG(LogPortal, Log, TEXT("Removed tracked actor %s."), *actorToRemove->GetName());
 }
 
-void APortal::AddDuplicateActor(AActor* actorToDuplicate)
+void APortal::HideActor(AActor* actor, bool hide)
 {
-
-}
-
-void APortal::RemoveDuplicateActor(AActor* actorToRemove)
-{
-
+	TArray<UActorComponent*> comps = actor->GetComponentsByClass(UStaticMeshComponent::StaticClass());
+	for (UActorComponent* comp : comps)
+	{
+		UStaticMeshComponent* staticComp = (UStaticMeshComponent*)comp;
+		staticComp->SetRenderInMainPass(!hide);
+	}
 }
 
 void APortal::CreatePortalTexture()
@@ -430,15 +444,15 @@ void APortal::UpdateTrackedActors()
 			trackedActor->Value->lastTrackedOrigin = currLocation;
 		}
 
-		// NOTE: Do post to avoid errors in for loop.
-		// Add to tracked actors of other portal after teleported.
+		// Ensure the tracked actor has been removed.
+		// Ensure the tracked actor has been added to target portal as its been teleported there.
+		// Ensure that the duplicate mesh at this portal spawned by the target portal is not hidden from the render pass.
 		for (AActor* actor : teleportedActors)
 		{
-			if (trackedActors.Contains(actor))
-			{
-				RemoveTrackedActor(actor);
-				pTargetPortal->AddTrackedActor(actor);
-			}
+			if (!actor || !actor->IsValidLowLevelFast()) continue;
+			if (trackedActors.Contains(actor)) RemoveTrackedActor(actor);
+			if (!pTargetPortal->trackedActors.Contains(actor)) pTargetPortal->AddTrackedActor(actor);
+			if (AActor* hasDuplicate = pTargetPortal->trackedActors.FindRef(actor)->trackedDuplicate) HideActor(hasDuplicate, false);
 		}
 	}	
 }
@@ -467,7 +481,7 @@ void APortal::TeleportObject(AActor* actor)
 	if (APortalPawn* isPawn = Cast<APortalPawn>(actor))
 	{
 		isPawn->PortalTeleport(pTargetPortal);
-		isPawn->physicsHandle->ReleaseComponent();
+		portalPawn->ReleaseInteractable();
 	}
 	else
 	{
@@ -476,7 +490,7 @@ void APortal::TeleportObject(AActor* actor)
 		{
 			if (isGrabbing == (UPrimitiveComponent*)actor->GetRootComponent())
 			{
-				portalPawn->physicsHandle->ReleaseComponent();
+				portalPawn->ReleaseInteractable();
 			}
 		}
 	}
@@ -485,6 +499,15 @@ void APortal::TeleportObject(AActor* actor)
 	pTargetPortal->UpdateWorldOffset();
 	pTargetPortal->UpdatePortalView();
 	pTargetPortal->lastPawnLoc = portalPawn->camera->GetComponentLocation();
+
+	// Make sure the duplicate created is not hidden...
+	if (pTargetPortal->trackedActors.Contains(actor))
+	{
+		if (AActor* hasDuplicate = pTargetPortal->trackedActors.FindRef(actor)->trackedDuplicate)
+		{
+			HideActor(hasDuplicate, false);
+		}
+	}
 }
 
 void APortal::DeleteCopy(AActor* actorToDelete)
@@ -551,6 +574,9 @@ void APortal::CopyActor(AActor* actorToCopy)
 
 	// Create duplicate map to original actor.
 	duplicateMap.Add(newActor, actorToCopy);
+
+	// Hide from main pass until it is overlapping the portal mesh.
+	HideActor(newActor);
 }
 
 bool APortal::IsInfront(FVector location)

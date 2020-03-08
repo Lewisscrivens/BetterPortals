@@ -200,11 +200,8 @@ public:
 	/* Removes a tracked actor and its duplicate. */
 	void RemoveTrackedActor(AActor* actorToRemove);
 
-	/* Creates a duplicate actor at the target portal. */
-	void AddDuplicateActor(AActor* actorToDuplicate);
-
-	/* Removes the duplicate actor from the target portal once teleported. */
-	void RemoveDuplicateActor(AActor* actorToRemove);
+	/* Hides a given actors static mesh components in the main pass render for the camera components. */
+	void HideActor(AActor* actor, bool hide = true);
 
 	/* Update the render texture for this portal using the scene capture component. */
 	UFUNCTION(BlueprintCallable, Category = "Portal")

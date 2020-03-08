@@ -505,9 +505,8 @@ void APortalPawn::ReturnToOrientation()
 {
 	float alpha = (GetWorld()->GetTimeSeconds() - orientationStart) / characterSettings.orientationCorrectionTime;
 	FRotator currentOrientation = playerCapsule->GetComponentRotation();
-	FQuat target = FRotator(0.0f, currentOrientation.Yaw, 0.0f).Quaternion();
-	FQuat newOrientation = FQuat::Slerp(currentOrientation.Quaternion(), target, alpha);
-	playerCapsule->SetWorldRotation(newOrientation.Rotator(), false, nullptr, ETeleportType::TeleportPhysics);
+	FRotator newOrientation = UKismetMathLibrary::RLerp(orientationAtStart, FRotator(0.0f, currentOrientation.Yaw, 0.0f), alpha, true);
+	playerCapsule->SetWorldRotation(newOrientation.Quaternion(), false, nullptr, ETeleportType::TeleportPhysics);
 	if (alpha >= 1.0f) orientation = false;
 }
 

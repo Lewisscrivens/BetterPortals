@@ -406,8 +406,12 @@ public:
 
 	/* Interact action. */
 	template<bool pressed> void InteractAction() { InteractAction(pressed); }
-	UFUNCTION(Category = "Movement")
+	UFUNCTION(Category = "Interaction")
 	void InteractAction(bool pressed);
+
+	/* Release anything grabbed with the physics handle. */
+	UFUNCTION(BlueprintCallable, Category = "Interaction")
+	void ReleaseInteractable();
 
 	/* Fire action. */
 	template<bool pressed> void FireAction() { FireAction(pressed); }
