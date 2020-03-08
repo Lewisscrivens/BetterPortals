@@ -102,32 +102,8 @@ void APortal::BeginPlay()
 	if (GetWorld() && GetWorld()->IsGameWorld())
 	{
 		// Bind the portals overlap events.
-		portalBox->OnComponentBeginOverlap.AddDynamic(this, &APortal::OnPortalBoxOverlapStart);
-		portalBox->OnComponentEndOverlap.AddDynamic(this, &APortal::OnPortalBoxOverlapEnd);
-		portalMesh->OnComponentBeginOverlap.AddDynamic(this, &APortal::OnPortalMeshOverlapStart);
-		portalMesh->OnComponentEndOverlap.AddDynamic(this, &APortal::OnPortalMeshOverlapEnd);
-	}
-
-	// Check if anything is already overlapping on begin play as overlap start will not be called in this case...
-	TSet<AActor*> overlappingActors;
-	portalBox->GetOverlappingActors(overlappingActors);
-	TArray<AActor*> overlappingActorsArr = overlappingActors.Array();
-	if (overlappingActorsArr.Num() > 0)
-	{
-		// For each found overlapping actor on begin play check if it can move and started overlapping in-front of the portal, if so track it until it ends its overlap.
-		for (AActor* overlappedActor : overlappingActorsArr)
-		{
-			// If a physics enabled actor passes through the portal from the correct direction duplicate and track said object at the target portal.
-			USceneComponent* overlappedRootComponent = overlappedActor->GetRootComponent();
-			if (overlappedRootComponent && overlappedRootComponent->IsSimulatingPhysics())
-			{
-				// Ensure that the item thats entering the portal is in-front.
-				if (!trackedActors.Contains(overlappedActor) && IsInfront(overlappedRootComponent->GetComponentLocation()))
-				{
-					AddTrackedActor(overlappedActor);
-				}
-			}
-		}
+		portalBox->OnComponentBeginOverlap.AddDynamic(this, &APortal::OnPortalOverlap);
+		portalBox->OnComponentEndOverlap.AddDynamic(this, &APortal::OnOverlapEnd);
 	}
 }
 
@@ -177,9 +153,9 @@ void APortal::Tick(float DeltaTime)
 	}
 }
 
-void APortal::OnPortalBoxOverlapStart(UPrimitiveComponent* portalMeshHit, AActor* overlappedActor, UPrimitiveComponent* overlappedComp, int32 otherBodyIndex, bool fromSweep, const FHitResult& portalHit)
+void APortal::OnPortalOverlap(UPrimitiveComponent* portalMeshHit, AActor* overlappedActor, UPrimitiveComponent* overlappedComp, int32 otherBodyIndex, bool fromSweep, const FHitResult& portalHit)
 {
-	// If a physics enabled actor passes through the portal from the correct direction, track said object at the target portal to determin when to teleport it.
+	// If a physics enabled actor passes through the portal from the correct direction duplicate and track said object at the target portal.
 	USceneComponent* overlappedRootComponent = overlappedActor->GetRootComponent();
 	if (overlappedRootComponent && overlappedRootComponent->IsSimulatingPhysics())
 	{
@@ -191,23 +167,13 @@ void APortal::OnPortalBoxOverlapStart(UPrimitiveComponent* portalMeshHit, AActor
 	}
 }
 
-void APortal::OnPortalBoxOverlapEnd(UPrimitiveComponent* portalMeshHit, AActor* overlappedActor, UPrimitiveComponent* overlappedComp, int32 otherBodyIndex)
+void APortal::OnOverlapEnd(UPrimitiveComponent* portalMeshHit, AActor* overlappedActor, UPrimitiveComponent* overlappedComp, int32 otherBodyIndex)
 {
 	// Remove the actor. Does nothing if the actor isn't being tracked. Will check this.
 	if (trackedActors.Contains(overlappedActor))
 	{
 		RemoveTrackedActor(overlappedActor);
 	}
-}
-
-void APortal::OnPortalMeshOverlapStart(UPrimitiveComponent* portalMeshHit, AActor* overlappedActor, UPrimitiveComponent* overlappedComp, int32 otherBodyIndex, bool fromSweep, const FHitResult& portalHit)
-{
-
-}
-
-void APortal::OnPortalMeshOverlapEnd(UPrimitiveComponent* portalMeshHit, AActor* overlappedActor, UPrimitiveComponent* overlappedComp, int32 otherBodyIndex)
-{
-
 }
 
 bool APortal::IsActive()
@@ -257,16 +223,6 @@ void APortal::RemoveTrackedActor(AActor* actorToRemove)
 
 	// Debug tracked actor.
 	if (debugTrackedActors) UE_LOG(LogPortal, Log, TEXT("Removed tracked actor %s."), *actorToRemove->GetName());
-}
-
-void APortal::AddDuplicateActor(AActor* actorToDuplicate)
-{
-
-}
-
-void APortal::RemoveDuplicateActor(AActor* actorToRemove)
-{
-
 }
 
 void APortal::CreatePortalTexture()

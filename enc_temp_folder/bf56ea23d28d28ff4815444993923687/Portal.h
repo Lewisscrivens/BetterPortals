@@ -170,21 +170,13 @@ public:
 	/* Frame. */
 	virtual void Tick(float DeltaTime) override;
 
-	/* Called when the portal box is overlapped. */
+	/* Called when the portal is overlapped. */
 	UFUNCTION(Category = "Portal")
-	void OnPortalBoxOverlapStart(UPrimitiveComponent* portalMeshHit, AActor* overlappedActor, UPrimitiveComponent* overlappedComp, int32 otherBodyIndex, bool fromSweep, const FHitResult& portalHit);
+	void OnPortalOverlap(UPrimitiveComponent* portalMeshHit, AActor* overlappedActor, UPrimitiveComponent* overlappedComp, int32 otherBodyIndex, bool fromSweep, const FHitResult& portalHit);
 	
-	/* Called when the portal box ends one of its overlap events. */
+	/* Called when the portal ends one of its overlap events. */
 	UFUNCTION(Category = "Portal")
-	void OnPortalBoxOverlapEnd(UPrimitiveComponent* portalMeshHit, AActor* overlappedActor, UPrimitiveComponent* overlappedComp, int32 otherBodyIndex);
-
-	/* Called when the portal mesh is overlapped. */
-	UFUNCTION(Category = "Portal")
-	void OnPortalMeshOverlapStart(UPrimitiveComponent* portalMeshHit, AActor* overlappedActor, UPrimitiveComponent* overlappedComp, int32 otherBodyIndex, bool fromSweep, const FHitResult& portalHit);
-
-	/* Called when the portal mesh ends one of its overlap events. */
-	UFUNCTION(Category = "Portal")
-	void OnPortalMeshOverlapEnd(UPrimitiveComponent* portalMeshHit, AActor* overlappedActor, UPrimitiveComponent* overlappedComp, int32 otherBodyIndex);
+	void OnOverlapEnd(UPrimitiveComponent* portalMeshHit, AActor* overlappedActor, UPrimitiveComponent* overlappedComp, int32 otherBodyIndex);
 
 	/* Is this portal active. */
 	UFUNCTION(BlueprintCallable, Category = "Portal")
@@ -195,16 +187,12 @@ public:
 	void SetActive(bool activate);
 
 	/* Adds a tracked actor to the tracked actor array updated in tick. */
+	UFUNCTION(BlueprintCallable, Category = "Portal")
 	void AddTrackedActor(AActor* actorToAdd);
 
 	/* Removes a tracked actor and its duplicate. */
+	UFUNCTION(BlueprintCallable, Category = "Portal")
 	void RemoveTrackedActor(AActor* actorToRemove);
-
-	/* Creates a duplicate actor at the target portal. */
-	void AddDuplicateActor(AActor* actorToDuplicate);
-
-	/* Removes the duplicate actor from the target portal once teleported. */
-	void RemoveDuplicateActor(AActor* actorToRemove);
 
 	/* Update the render texture for this portal using the scene capture component. */
 	UFUNCTION(BlueprintCallable, Category = "Portal")
