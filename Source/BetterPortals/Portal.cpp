@@ -289,11 +289,14 @@ void APortal::RemoveTrackedActor(AActor* actorToRemove)
 
 void APortal::HideActor(AActor* actor, bool hide)
 {
-	TArray<UActorComponent*> comps = actor->GetComponentsByClass(UStaticMeshComponent::StaticClass());
-	for (UActorComponent* comp : comps)
+	if (actor->IsValidLowLevel())
 	{
-		UStaticMeshComponent* staticComp = (UStaticMeshComponent*)comp;
-		staticComp->SetRenderInMainPass(!hide);
+		TArray<UActorComponent*> comps = actor->GetComponentsByClass(UStaticMeshComponent::StaticClass());
+		for (UActorComponent* comp : comps)
+		{
+			UStaticMeshComponent* staticComp = (UStaticMeshComponent*)comp;
+			staticComp->SetRenderInMainPass(!hide);
+		}
 	}
 }
 
@@ -539,7 +542,7 @@ void APortal::DeleteCopy(AActor* actorToDelete)
 			duplicateMap.Remove(isValid);
 
 			// Destroy if it has not begun its destruction process.
-			if (isValid->IsValidLowLevelFast() && !isValid->IsPendingKillOrUnreachable() && !isValid->IsPendingKillPending())
+			if (isValid->IsValidLowLevel() && !isValid->IsPendingKillOrUnreachable() && !isValid->IsPendingKillPending())
 			{
 				// If world is valid.
 				if (UWorld* world = GetWorld())
