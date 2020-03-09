@@ -100,6 +100,10 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Portal")
 	int recursionAmount;
 
+	/* The percentage of the screen resolution to render the portal at. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Portal", meta = (UIMin = "0.0", UIMax = "1.0", ClampMin = "0.0", ClampMax = "1.0"))
+	float resolutionPercentile;
+
 	/* Debug the duplicated camera position and rotation relative to the other portal by drawing debug cube based of scenecapture2D transform. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Portal|Debugging")
 	bool debugCameraTransform;

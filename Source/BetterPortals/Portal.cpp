@@ -67,6 +67,7 @@ APortal::APortal()
 	debugTrackedActors = false;
 	actorsBeingTracked = 0;
 	recursionAmount = 5;
+	resolutionPercentile = 1.0f;
 }
 
 void APortal::BeginPlay()
@@ -305,6 +306,8 @@ void APortal::CreatePortalTexture()
 	// Create default texture size.
 	int32 viewportX, viewportY;
 	portalController->GetViewportSize(viewportX, viewportY);
+	viewportX *= resolutionPercentile;
+	viewportY *= resolutionPercentile;
 	UE_LOG(LogPortal, Log, TEXT("Portal render target created with width: %f and height: %f"), (float)viewportX, (float)viewportY);
 
 	// Create new render texture.
