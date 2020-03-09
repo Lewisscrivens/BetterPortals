@@ -153,7 +153,11 @@ void APortalPawn::JumpAction(bool pressed)
 			playerCapsule->SetPhysicsLinearVelocity(newVel);
 
 			// Add impulse upwards and towards the direction the player was moving.
-			FVector jumpDirection = (playerCapsule->GetUpVector() + FVector(characterSettings.movementDir.X / -2, characterSettings.movementDir.Y / 2, 0.0f)).GetSafeNormal();
+			FVector currentInputDirection = FVector(characterSettings.movementDir.Y / 2, characterSettings.movementDir.X / 2, 0.0f);
+			FVector cameraForward = camera->GetForwardVector();
+			cameraForward.Z = 0.0f;
+			currentInputDirection = cameraForward.Rotation().RotateVector(currentInputDirection);
+			FVector jumpDirection = (playerCapsule->GetUpVector() + currentInputDirection).GetSafeNormal();
 			playerCapsule->AddImpulse(1000.0f * characterSettings.jumpForce * jumpDirection);
 			jumpCount++;
 		}
