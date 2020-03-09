@@ -527,8 +527,9 @@ void APortal::DeleteCopy(AActor* actorToDelete)
 				// If world is valid.
 				if (UWorld* world = GetWorld())
 				{
-					isValid->Destroy();
+					world->DestroyActor(isValid);
 					isValid = nullptr;
+					world->ForceGarbageCollection();
 				}
 			}
 		}

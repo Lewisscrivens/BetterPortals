@@ -352,21 +352,17 @@ bool APortalPawn::GroundCheck()
 	collParams.AddIgnoredActor(this);
 	FVector capsuleBottom = playerCapsule->GetComponentLocation();
 	capsuleBottom.Z -= characterSettings.GetCurrentMovementState() == EMovementState::CROUCHING ? characterSettings.crouchingHeight : characterSettings.standingHeight;
-	GetWorld()->LineTraceSingleByChannel(groundHit, capsuleBottom, capsuleBottom - (playerCapsule->GetUpVector() * characterSettings.groundCheckDistance), ECC_Pawn, collParams);
+	float radius = playerCapsule->GetScaledCapsuleRadius();
+	capsuleBottom.Z += radius;
+	FCollisionShape sphere = FCollisionShape::MakeSphere(radius);
+	GetWorld()->SweepSingleByChannel(groundHit, capsuleBottom, capsuleBottom - FVector(0.0f, 0.0f, characterSettings.groundCheckDistance), FQuat::Identity, ECC_Pawn, sphere, collParams);
 	characterSettings.lastGroundHit = groundHit;
 
 	// If debugging is enabled for the ground check draw it on screen.
 	if (debugSettings.debugGroundTrace)
 	{
-		if (groundHit.bBlockingHit)
-		{
-			DrawDebugLine(GetWorld(), groundHit.TraceStart, groundHit.Location, FColor::Green, false, 0.05f, 0.0f, 0.5f);
-			DrawDebugPoint(GetWorld(), groundHit.Location, 5.0f, FColor::Red, false, 0.05f, 0.0f);
-		}
-		else
-		{
-			DrawDebugLine(GetWorld(), groundHit.TraceStart, groundHit.TraceEnd, FColor::Red, false, 0.05f, 0.0f, 0.5f);
-		}
+		if (groundHit.bBlockingHit) DrawDebugSphere(GetWorld(), groundHit.TraceStart, radius, 10.0f, FColor::Green, false, 0.05f, 0.0f, 0.5f);
+		else  DrawDebugSphere(GetWorld(), groundHit.TraceStart, radius, 10.0f, FColor::Red, false, 0.05f, 0.0f, 0.5f);
 	}
 
 	// Act on the character being grounded or in the air.

@@ -177,7 +177,7 @@ public:
 		crouchTime = 0.2f;
 		jumpForce = 20.0f;
 		mass = 50.0f;
-		groundCheckDistance = 20.0f;
+		groundCheckDistance = 5.0f;
 		currentMovementSpeed = walkSpeed;
 		currentMovementState = EMovementState::WALKING; 
 		doubleJump = false;
