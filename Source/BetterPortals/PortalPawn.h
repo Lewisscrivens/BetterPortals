@@ -406,7 +406,7 @@ public:
 
 	/* Interact action. */
 	template<bool pressed> void InteractAction() { InteractAction(pressed); }
-	UFUNCTION(Category = "Interaction")
+	UFUNCTION(BlueprintCallable, Category = "Interaction")
 	void InteractAction(bool pressed);
 
 	/* Release anything grabbed with the physics handle. */
