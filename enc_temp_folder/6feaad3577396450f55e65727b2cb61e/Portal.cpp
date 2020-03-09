@@ -516,8 +516,6 @@ void APortal::DeleteCopy(AActor* actorToDelete)
 	// NOTE: Put a few checks in here because at high velocities destroyActor was becoming invalid.
 	if (trackedActors.FindRef(actorToDelete))
 	{
-		// Ensure actor is valid...
-		// NOTE: Keeps throwing errors when destroying actor on a null error. Running out of ways to check it is valid before destructon?...
 		if (AActor* isValid = trackedActors.FindRef(actorToDelete)->trackedDuplicate)
 		{
 			// Also remove from duplicate map.
