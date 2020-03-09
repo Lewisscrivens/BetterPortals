@@ -156,6 +156,10 @@ protected:
 	/* Level start. */
 	virtual void BeginPlay() override;
 
+	/* Delayed setup function. */
+	UFUNCTION()
+	void Setup();
+
 	/* Post initialization. */
 	virtual void PostInitializeComponents() override;
 

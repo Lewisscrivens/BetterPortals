@@ -18,6 +18,7 @@
 #include "DrawDebugHelpers.h"
 #include "Kismet/KismetRenderingLibrary.h"
 #include "Engine/StaticMesh.h"
+#include "TimerManager.h"
 
 DEFINE_LOG_CATEGORY(LogPortal);
 
@@ -72,10 +73,20 @@ void APortal::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// Delay setup for 2 seconds.
+	PrimaryActorTick.SetTickFunctionEnable(false);
+	FTimerHandle timer;
+	FTimerDelegate timerDel;
+	timerDel.BindUFunction(this, "Setup");
+	GetWorldTimerManager().SetTimer(timer, timerDel, 1.0f, false, 1.0f);
+}
+
+void APortal::Setup()
+{
 	// If there is no target destroy and print log message.
 	pTargetPortal = Cast<APortal>(targetPortal);
 	CHECK_DESTROY(LogPortal, (!targetPortal || !pTargetPortal), "Portal %s, was destroyed as there was no target portal or it wasnt a type of APortal class.", *GetName());
-	
+
 	// Save a reference to the player controller.
 	APlayerController* PC = GetWorld()->GetFirstPlayerController();
 	CHECK_DESTROY(LogPortal, !PC, "Player controller could not be found in the portal class %s.", *GetName());
@@ -129,6 +140,9 @@ void APortal::BeginPlay()
 			}
 		}
 	}
+
+	// After setup is done enable ticking functions.
+	PrimaryActorTick.SetTickFunctionEnable(true);
 }
 
 void APortal::PostInitializeComponents()
@@ -288,6 +302,7 @@ void APortal::CreatePortalTexture()
 	// Create default texture size.
 	int32 viewportX, viewportY;
 	portalController->GetViewportSize(viewportX, viewportY);
+	UE_LOG(LogPortal, Log, TEXT("Portal render target created with width: %f and height: %f"), (float)viewportX, (float)viewportY);
 
 	// Create new render texture.
 	renderTarget = nullptr;
