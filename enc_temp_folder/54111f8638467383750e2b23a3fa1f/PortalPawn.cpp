@@ -451,9 +451,9 @@ void APortalPawn::UpdateMouseMovement(float deltaTime)
 	// Camera movement.
 	FRotator newRelativeCameraRot = camera->GetRelativeTransform().Rotator();
 	newRelativeCameraRot.Pitch += (mouseY * characterSettings.mouseSpeed);
+	newRelativeCameraRot.Pitch = FMath::Clamp(newRelativeCameraRot.Pitch, -characterSettings.cameraPitch, characterSettings.cameraPitch);
 	newRelativeCameraRot.Yaw += (mouseX * characterSettings.mouseSpeed);
 	newRelativeCameraRot.Roll = 0.0f;
-	newRelativeCameraRot.Pitch = FMath::Clamp(newRelativeCameraRot.Pitch, -characterSettings.cameraPitch, characterSettings.cameraPitch);
 	camera->SetRelativeRotation(newRelativeCameraRot);
 	
 #if CHAR_DEBUG

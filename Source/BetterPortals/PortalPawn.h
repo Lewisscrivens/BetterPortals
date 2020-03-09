@@ -48,7 +48,7 @@ public:
 		float orientationCorrectionTime;
 
 	/* Camera pitch amount */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Camera")
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Camera", meta = (UIMin = "0.0", UIMax = "85.0", ClampMin = "0.0", ClampMax = "85.0"))
 		float cameraPitch;
 
 	/* Camera movement speed amount */
@@ -159,7 +159,7 @@ public:
 		throwForce = 5.0f;
 
 		// Camera default values.
-		cameraPitch = 90.0f;
+		cameraPitch = 85.0f;
 		mouseSpeed = 1.0f;
 
 		// Setup default movement values.
