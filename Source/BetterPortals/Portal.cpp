@@ -19,6 +19,8 @@
 #include "Kismet/KismetRenderingLibrary.h"
 #include "Engine/StaticMesh.h"
 #include "TimerManager.h"
+#include "BetterPortalsGameModeBase.h"
+#include "Kismet/GameplayStatics.h"
 
 DEFINE_LOG_CATEGORY(LogPortal);
 
@@ -194,7 +196,7 @@ void APortal::Tick(float DeltaTime)
 
 void APortal::OnPortalBoxOverlapStart(UPrimitiveComponent* portalMeshHit, AActor* overlappedActor, UPrimitiveComponent* overlappedComp, int32 otherBodyIndex, bool fromSweep, const FHitResult& portalHit)
 {
-	// If a physics enabled actor passes through the portal from the correct direction, track said object at the target portal to determin when to teleport it.
+	// If a physics enabled actor passes through the portal from the correct direction, track said object at the target portal to determine when to teleport it.
 	USceneComponent* overlappedRootComponent = overlappedActor->GetRootComponent();
 	if (overlappedRootComponent && overlappedRootComponent->IsSimulatingPhysics())
 	{
@@ -220,7 +222,7 @@ void APortal::OnPortalMeshOverlapStart(UPrimitiveComponent* portalMeshHit, AActo
 	// Unhide the actor once its overlapping with the portal itself.
 	if (trackedActors.Contains(overlappedActor))
 	{
-		if (AActor* hasDuplicate = trackedActors.FindRef(overlappedActor)->trackedDuplicate)
+		if (AActor* hasDuplicate = trackedActors.FindRef(overlappedActor).trackedDuplicate)
 		{
 			HideActor(hasDuplicate, false);
 		}
@@ -232,7 +234,7 @@ void APortal::OnPortalMeshOverlapEnd(UPrimitiveComponent* portalMeshHit, AActor*
 	// Hide the actor once its ended its overlap with the portal by exiting it not passing through it.
 	if (trackedActors.Contains(overlappedActor))
 	{
-		if (AActor* hasDuplicate = trackedActors.FindRef(overlappedActor)->trackedDuplicate)
+		if (AActor* hasDuplicate = trackedActors.FindRef(overlappedActor).trackedDuplicate)
 		{
 			HideActor(hasDuplicate);
 		}
@@ -250,6 +252,19 @@ void APortal::SetActive(bool activate)
 	currentFrameCount = 0;
 }
 
+void APortal::HideActor(AActor* actor, bool hide)
+{
+	if (actor->IsValidLowLevel())
+	{
+		TArray<UActorComponent*> comps = actor->GetComponentsByClass(UStaticMeshComponent::StaticClass());
+		for (UActorComponent* comp : comps)
+		{
+			UStaticMeshComponent* staticComp = (UStaticMeshComponent*)comp;
+			staticComp->SetRenderInMainPass(!hide);
+		}
+	}
+}
+
 void APortal::AddTrackedActor(AActor* actorToAdd)
 {
 	// Ensure the actor is not null.
@@ -257,9 +272,8 @@ void APortal::AddTrackedActor(AActor* actorToAdd)
 
 	// Create tracked actor struct.
 	// NOTE: If its the pawn track the camera otherwise track the root component...
-	FTrackedActor* track;
-	track = new FTrackedActor(actorToAdd->GetRootComponent());
-	track->lastTrackedOrigin = actorToAdd->GetActorLocation();
+	FTrackedActor track = FTrackedActor(actorToAdd->GetRootComponent());
+	track.lastTrackedOrigin = actorToAdd->GetActorLocation();
 
 	// Add to tracked actors.
 	trackedActors.Add(actorToAdd, track);
@@ -288,21 +302,8 @@ void APortal::RemoveTrackedActor(AActor* actorToRemove)
 	if (debugTrackedActors) UE_LOG(LogPortal, Log, TEXT("Removed tracked actor %s."), *actorToRemove->GetName());
 }
 
-void APortal::HideActor(AActor* actor, bool hide)
-{
-	if (actor->IsValidLowLevel())
-	{
-		TArray<UActorComponent*> comps = actor->GetComponentsByClass(UStaticMeshComponent::StaticClass());
-		for (UActorComponent* comp : comps)
-		{
-			UStaticMeshComponent* staticComp = (UStaticMeshComponent*)comp;
-			staticComp->SetRenderInMainPass(!hide);
-		}
-	}
-}
-
 void APortal::CreatePortalTexture()
-{
+{		
 	// Create default texture size.
 	int32 viewportX, viewportY;
 	portalController->GetViewportSize(viewportX, viewportY);
@@ -427,10 +428,10 @@ void APortal::UpdateTrackedActors()
 	if (actorsBeingTracked > 0)
 	{
 		TArray<AActor*> teleportedActors;
-		for (TMap<AActor*, FTrackedActor*>::TIterator trackedActor = trackedActors.CreateIterator(); trackedActor; ++trackedActor)
+		for (TMap<AActor*, FTrackedActor>::TIterator trackedActor = trackedActors.CreateIterator(); trackedActor; ++trackedActor)
 		{
 			// Update the positions for the duplicate tracked actors at the target portal. NOTE: Only if it isn't null.
-			AActor* isValid = trackedActor->Value->trackedDuplicate;
+			AActor* isValid = trackedActor->Value.trackedDuplicate;
 			if (isValid && isValid->IsValidLowLevel())
 			{
 				FVector convertedLoc = ConvertLocationToPortal(trackedActor->Key->GetActorLocation(), this, pTargetPortal);
@@ -443,10 +444,10 @@ void APortal::UpdateTrackedActors()
 			if (APortalPawn* isPlayer = Cast<APortalPawn>(trackedActor->Key)) continue;
 
 			// Check for when the actors origin passes to the other side of the portal between frames.
-			FVector currLocation = trackedActor->Value->trackedComp->GetComponentLocation();
+			FVector currLocation = trackedActor->Value.trackedComp->GetComponentLocation();
 			FVector pointInterscetion;
 			FPlane portalPlane = FPlane(portalMesh->GetComponentLocation(), portalMesh->GetForwardVector());
-			bool passedThroughPortal = FMath::SegmentPlaneIntersection(trackedActor->Value->lastTrackedOrigin, currLocation, portalPlane, pointInterscetion);
+			bool passedThroughPortal = FMath::SegmentPlaneIntersection(trackedActor->Value.lastTrackedOrigin, currLocation, portalPlane, pointInterscetion);
 			if (passedThroughPortal)
 			{
 				// Teleport the actor.
@@ -462,7 +463,7 @@ void APortal::UpdateTrackedActors()
 			}
 
 			// Update last tracked origin.
-			trackedActor->Value->lastTrackedOrigin = currLocation;
+			trackedActor->Value.lastTrackedOrigin = currLocation;
 		}
 
 		// Ensure the tracked actor has been removed.
@@ -473,7 +474,7 @@ void APortal::UpdateTrackedActors()
 			if (!actor || !actor->IsValidLowLevelFast()) continue;
 			if (trackedActors.Contains(actor)) RemoveTrackedActor(actor);
 			if (!pTargetPortal->trackedActors.Contains(actor)) pTargetPortal->AddTrackedActor(actor);
-			if (AActor* hasDuplicate = pTargetPortal->trackedActors.FindRef(actor)->trackedDuplicate) HideActor(hasDuplicate, false);
+			if (AActor* hasDuplicate = pTargetPortal->trackedActors.FindRef(actor).trackedDuplicate) HideActor(hasDuplicate, false);
 		}
 	}	
 }
@@ -521,10 +522,10 @@ void APortal::TeleportObject(AActor* actor)
 	pTargetPortal->UpdatePortalView();
 	pTargetPortal->lastPawnLoc = portalPawn->camera->GetComponentLocation();
 
-	// Make sure the duplicate created is not hidden...
+	// Make sure the duplicate created is not hidden after teleported.
 	if (pTargetPortal->trackedActors.Contains(actor))
 	{
-		if (AActor* hasDuplicate = pTargetPortal->trackedActors.FindRef(actor)->trackedDuplicate)
+		if (AActor* hasDuplicate = pTargetPortal->trackedActors.FindRef(actor).trackedDuplicate)
 		{
 			HideActor(hasDuplicate, false);
 		}
@@ -535,11 +536,11 @@ void APortal::DeleteCopy(AActor* actorToDelete)
 {
 	// Destroy visual copy of the tracked actor.
 	// NOTE: Put a few checks in here because at high velocities destroyActor was becoming invalid.
-	if (trackedActors.FindRef(actorToDelete))
+	if (trackedActors.Contains(actorToDelete))
 	{
 		// Ensure actor is valid...
-		// NOTE: Keeps throwing errors when destroying actor on a null error. Running out of ways to check it is valid before destructon?...
-		if (AActor* isValid = trackedActors.FindRef(actorToDelete)->trackedDuplicate)
+		// NOTE: Keeps throwing errors when destroying actor on a null error. Running out of ways to check it is valid before destruction?...
+		if (AActor* isValid = trackedActors.FindRef(actorToDelete).trackedDuplicate)
 		{
 			// Also remove from duplicate map.
 			duplicateMap.Remove(isValid);
@@ -592,8 +593,11 @@ void APortal::CopyActor(AActor* actorToCopy)
 		}
 	}
 	
-	// Add it to the actors tracking information.
-	trackedActors.FindRef(actorToCopy)->trackedDuplicate = newActor;
+	// Update the actors tracking information.
+	FTrackedActor newTrackingInfo = trackedActors.FindRef(actorToCopy);
+	newTrackingInfo.trackedDuplicate = newActor;
+	trackedActors.Remove(actorToCopy);
+	trackedActors.Add(actorToCopy, newTrackingInfo);
 
 	// Setup location and rotation for this frame.
 	FVector newLoc = ConvertLocationToPortal(newActor->GetActorLocation(), this, pTargetPortal);

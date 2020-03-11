@@ -492,9 +492,6 @@ void APortalPawn::UpdatePhysicsHandleOffset()
 
 void APortalPawn::PortalTeleport(APortal* targetPortal)
 {
-	// If the target portal is at the same orientation upwards as its target then return as orientation does not need to be adjusted.
-	if (targetPortal->pTargetPortal->GetActorUpVector() == targetPortal->GetActorUpVector()) return;
-
 	// Start timer to return the player to the correct orientation relative to the world.
 	orientationStart = GetWorld()->GetTimeSeconds();
 	orientationAtStart = playerCapsule->GetComponentRotation();

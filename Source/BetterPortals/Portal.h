@@ -121,16 +121,39 @@ public:
 	/* Is this portal active? NOTE: Currently does nothing but is true when its being updated. */
 	bool active; 
 
+protected:
+
+	/* The player controller. */
+	UPROPERTY()
+	class APlayerController* portalController; 
+
+	/* The portal pawn. */
+	UPROPERTY()
+	class APortalPawn* portalPawn; 
+
+	/* The portals render target texture. */
+	UPROPERTY()
+	class UCanvasRenderTarget2D* renderTarget; 
+
+	/* The performance render targets used when latePortalUpdate is being used. */
+	UPROPERTY()
+	TArray<UCanvasRenderTarget2D*> renderTargets; 
+
+	/* The portals dynamic material instance. */
+	UPROPERTY()
+	class UMaterialInstanceDynamic* portalMaterial; 
+
+	/* Tracked actor map where each tracked actor has tracked settings like last location etc. */
+	UPROPERTY()
+	TMap<AActor*, FTrackedActor> trackedActors; 
+
+	/* Map to find an original actor from a tracked duplicate actor from a hit result for example on a duplicate. */
+	UPROPERTY()
+	TMap<AActor*, AActor*> duplicateMap; 
+
 private:
 
 	bool initialised; /* Has begin play been ran. */
-	class APlayerController* portalController; /* The player controller. */
-	class APortalPawn* portalPawn; /* The portal pawn. */
-	class UCanvasRenderTarget2D* renderTarget; /* The portals render target texture. */
-	TArray<UCanvasRenderTarget2D*> renderTargets; /* The performance render targets used when latePortalUpdate is being used. */
-	class UMaterialInstanceDynamic* portalMaterial; /* The portals dynamic material instance. */
-	TMap<AActor*, FTrackedActor*> trackedActors; /* Tracked actor map where each tracked actor has tracked settings like last location etc. */
-	TMap<AActor*, AActor*> duplicateMap; /* Map to find an original actor from a tracked duplicate actor from a hit result for example on a duplicate. */
 	int actorsBeingTracked; /* Number of actors currently being tracked. */
 	int currentFrameCount; /* Frame count for updating the portals one frame late. */
 	FVector lastPawnLoc; /* The pawns last tracked location for calculating when to teleport the player. */
@@ -186,14 +209,14 @@ public:
 	UFUNCTION(Category = "Portal")
 	void OnPortalBoxOverlapEnd(UPrimitiveComponent* portalMeshHit, AActor* overlappedActor, UPrimitiveComponent* overlappedComp, int32 otherBodyIndex);
 
-	/* Called when the portal mesh is overlapped. */
+	/* Called when the portal mesh ends one of its overlap events. */
 	UFUNCTION(Category = "Portal")
 	void OnPortalMeshOverlapStart(UPrimitiveComponent* portalMeshHit, AActor* overlappedActor, UPrimitiveComponent* overlappedComp, int32 otherBodyIndex, bool fromSweep, const FHitResult& portalHit);
-
+	
 	/* Called when the portal mesh ends one of its overlap events. */
 	UFUNCTION(Category = "Portal")
 	void OnPortalMeshOverlapEnd(UPrimitiveComponent* portalMeshHit, AActor* overlappedActor, UPrimitiveComponent* overlappedComp, int32 otherBodyIndex);
-
+	
 	/* Is this portal active. */
 	UFUNCTION(BlueprintCallable, Category = "Portal")
 	bool IsActive();
@@ -202,14 +225,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Portal")
 	void SetActive(bool activate);
 
+	/* Hides a copied version of an actor from the main render pass so it still casts shadows... */
+	void HideActor(AActor* actor, bool hide = true);
+
 	/* Adds a tracked actor to the tracked actor array updated in tick. */
 	void AddTrackedActor(AActor* actorToAdd);
 
 	/* Removes a tracked actor and its duplicate. */
 	void RemoveTrackedActor(AActor* actorToRemove);
-
-	/* Hides a given actors static mesh components in the main pass render for the camera components. */
-	void HideActor(AActor* actor, bool hide = true);
 
 	/* Update the render texture for this portal using the scene capture component. */
 	UFUNCTION(BlueprintCallable, Category = "Portal")
