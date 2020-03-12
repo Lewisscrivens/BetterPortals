@@ -7,7 +7,7 @@ which is similar although it is all done in blueprints.
 
 ----------------------------------------------------------------------------------
 
-![logo](Assets/Readme/Example.png)
+![logo](Assets/Readme/Example.jpg)
 
 ----------------------------------------------------------------------------------
 
@@ -18,5 +18,17 @@ Features:
 - Portal Pawn.
 - Portal function replacements.
 - Portal Manager in the game mode.
+- Physics Object support.
+- Velocity Limiter for actors.
+- VR material created.
+- Demo levels.
 
-The project is intended for educational purposes and free to use by anyone.
+Future Improvements:
+
+- VR Portals using CubeCaptureComponent.
+- VR Demo room.
+
+The project is intended for educational purposes and free to use by anyone. 
+NOTE: Built project can be found bellow the project was created using UE4.23.
+
+https://drive.google.com/file/d/14fQ7nERu09DV9Enyll86yGZlfuq9a5v9/view?usp=sharing
