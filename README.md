@@ -7,7 +7,7 @@ which is similar although it is all done in blueprints.
 
 ----------------------------------------------------------------------------------
 
-![logo](Assets/Readme/Example.jpg)(https://youtu.be/Yhr1jgLbHxk)
+[![logo](Assets/Readme/Example.jpg)](https://youtu.be/Yhr1jgLbHxk)
 
 ----------------------------------------------------------------------------------
 
