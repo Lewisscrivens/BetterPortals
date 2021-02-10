@@ -1,5 +1,11 @@
 # Better Portals
 
+This project has been compiled into a useable plugin for any projects you can imagine its useful for! There is also a tutorial on how to set it up and the basics of using it.
+
+Find it here: 
+
+https://github.com/Lewisscrivens/BetterPortalsPlugin
+
 Better portals for Unreal Engine 4! Took a while to figure this stuff out but I know allot of students and developers have
 been asking the question of how this is done. That brings me to the purpose of this project, which is to show the use of 
 portals within Unreal Engine 4 to create Non-Euclidean style game-play mechanics. There does exsist a project on the marketplace
